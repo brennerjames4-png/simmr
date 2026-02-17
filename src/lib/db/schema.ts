@@ -72,24 +72,30 @@ export const difficultyEnum = pgEnum("difficulty_level", [
   "expert",
 ]);
 
-export const users = pgTable("users", {
-  id: text("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  username: varchar("username", { length: 50 }).unique().notNull(),
-  displayName: varchar("display_name", { length: 100 }).notNull(),
-  email: varchar("email", { length: 255 }).unique(),
-  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
-  avatarUrl: text("avatar_url"),
-  bio: text("bio"),
-  kitchenInventory: jsonb("kitchen_inventory").$type<KitchenInventory>(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    username: varchar("username", { length: 50 }).unique().notNull(),
+    displayName: varchar("display_name", { length: 100 }).notNull(),
+    email: varchar("email", { length: 255 }).unique(),
+    passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+    avatarUrl: text("avatar_url"),
+    bio: text("bio"),
+    kitchenInventory: jsonb("kitchen_inventory").$type<KitchenInventory>(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_users_display_name").on(table.displayName),
+  ]
+);
 
 export const posts = pgTable(
   "posts",

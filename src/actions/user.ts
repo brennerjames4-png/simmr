@@ -5,6 +5,8 @@ import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { searchUsers as searchUsersQuery } from "@/queries/users";
+import type { SearchUser } from "@/queries/users";
 
 export async function updateAvatar(avatarUrl: string) {
   const user = await requireAuth();
@@ -23,4 +25,9 @@ export async function updateAvatar(avatarUrl: string) {
   revalidatePath("/feed");
 
   return { success: true };
+}
+
+export async function searchUsers(query: string): Promise<SearchUser[]> {
+  await requireAuth();
+  return searchUsersQuery(query);
 }

@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { users, posts, likes } from "@/lib/db/schema";
-import { eq, sql, count } from "drizzle-orm";
+import { eq, sql, count, or, ilike } from "drizzle-orm";
 import type { User } from "@/lib/db/schema";
 
 export type UserProfile = User & {
@@ -34,4 +34,38 @@ export async function getUserByUsername(
 
   if (result.length === 0) return null;
   return result[0];
+}
+
+export type SearchUser = {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+  bio: string | null;
+};
+
+export async function searchUsers(query: string): Promise<SearchUser[]> {
+  if (!query || query.trim().length === 0) return [];
+
+  const searchTerm = `%${query.trim()}%`;
+
+  const results = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
+      bio: users.bio,
+    })
+    .from(users)
+    .where(
+      or(
+        ilike(users.username, searchTerm),
+        ilike(users.displayName, searchTerm)
+      )
+    )
+    .orderBy(users.displayName)
+    .limit(10);
+
+  return results;
 }

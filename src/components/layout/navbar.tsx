@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PlusCircle, LogOut } from "lucide-react";
+import { PlusCircle, LogOut, Search } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,12 @@ export function Navbar({ user }: { user: User }) {
       <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4">
         <Logo />
         <div className="flex items-center gap-2">
+          <Button asChild variant="ghost" size="icon" className="hidden md:inline-flex">
+            <Link href="/search">
+              <Search className="h-5 w-5" />
+              <span className="sr-only">Search users</span>
+            </Link>
+          </Button>
           <Button asChild variant="ghost" size="icon">
             <Link href="/post/new">
               <PlusCircle className="h-5 w-5" />
