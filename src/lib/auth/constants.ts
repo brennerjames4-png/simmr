@@ -5,5 +5,6 @@ export const ADMIN_CREDENTIALS = {
 } as const;
 
 export const AUTH_COOKIE_NAME = "simmr-session";
+export const ONBOARDING_COOKIE_NAME = "simmr-onboarding";
 export const AUTH_SECRET =
   process.env.AUTH_SECRET || "simmr-dev-secret-change-in-production";

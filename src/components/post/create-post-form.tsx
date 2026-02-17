@@ -26,18 +26,17 @@ export function CreatePostForm() {
   const [state, action, isPending] = useActionState(createPost, undefined);
 
   function handleGenerateIngredients() {
-    const servingsNum = parseInt(servings);
+    const servingsNum = servings ? parseInt(servings) : undefined;
     if (!title.trim()) {
       toast.error("Enter a dish name first");
       return;
     }
-    if (!servingsNum || servingsNum < 1) {
-      toast.error("Enter the number of servings");
-      return;
-    }
 
     startGenerating(async () => {
-      const result = await generateIngredients(title, servingsNum);
+      const result = await generateIngredients(
+        title,
+        servingsNum && servingsNum >= 1 ? servingsNum : undefined
+      );
       if (result.error) {
         toast.error(result.error);
       } else if (result.ingredients) {
@@ -204,7 +203,7 @@ export function CreatePostForm() {
             variant="outline"
             size="sm"
             onClick={handleGenerateIngredients}
-            disabled={isGenerating || !title.trim() || !servings}
+            disabled={isGenerating || !title.trim()}
           >
             {isGenerating ? (
               <>
@@ -284,8 +283,8 @@ export function CreatePostForm() {
 
         {ingredients.length === 0 && (
           <p className="text-xs text-muted-foreground">
-            Fill in the dish name and servings, then click &quot;Generate with
-            AI&quot; to auto-create an ingredient list.
+            Fill in the dish name, then click &quot;Generate with AI&quot; to
+            auto-create an ingredient list.
           </p>
         )}
       </div>

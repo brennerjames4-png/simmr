@@ -1,14 +1,12 @@
 "use server";
 
-import { SignJWT } from "jose";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { ADMIN_CREDENTIALS, AUTH_COOKIE_NAME, AUTH_SECRET } from "./constants";
+import { ADMIN_CREDENTIALS, AUTH_COOKIE_NAME } from "./constants";
+import { createSession } from "./session";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-
-const secret = new TextEncoder().encode(AUTH_SECRET);
 
 export async function signIn(
   _prevState: { error?: string } | undefined,
@@ -33,20 +31,7 @@ export async function signIn(
     return { error: "User not found in database" };
   }
 
-  const token = await new SignJWT({ userId: user.id, username: user.username })
-    .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("7d")
-    .sign(secret);
-
-  const cookieStore = await cookies();
-  cookieStore.set(AUTH_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 7, // 7 days
-    path: "/",
-  });
-
+  await createSession(user.id, user.username);
   redirect("/feed");
 }
 

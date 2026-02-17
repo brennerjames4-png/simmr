@@ -6,7 +6,7 @@ import type { Ingredient } from "@/lib/db/schema";
 
 export async function generateIngredients(
   dishName: string,
-  servings: number
+  servings?: number
 ): Promise<{ ingredients?: Ingredient[]; error?: string }> {
   await requireAuth();
 
@@ -14,11 +14,10 @@ export async function generateIngredients(
     return { error: "Please enter a dish name first" };
   }
 
-  if (!servings || servings < 1) {
-    return { error: "Please enter the number of servings" };
-  }
-
-  const ingredients = await generateIngredientList(dishName, servings);
+  const ingredients = await generateIngredientList(
+    dishName,
+    servings && servings >= 1 ? servings : undefined
+  );
 
   if (!ingredients) {
     return { error: "Failed to generate ingredients. Please try again." };

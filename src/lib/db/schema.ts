@@ -4,6 +4,7 @@ import {
   varchar,
   timestamp,
   integer,
+  boolean,
   pgEnum,
   unique,
   index,
@@ -81,7 +82,10 @@ export const users = pgTable(
     username: varchar("username", { length: 50 }).unique().notNull(),
     displayName: varchar("display_name", { length: 100 }).notNull(),
     email: varchar("email", { length: 255 }).unique(),
-    passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+    emailVerified: boolean("email_verified").default(false).notNull(),
+    passwordHash: varchar("password_hash", { length: 255 }),
+    authProvider: text("auth_provider").default("credentials").notNull(),
+    googleId: text("google_id").unique(),
     avatarUrl: text("avatar_url"),
     bio: text("bio"),
     kitchenInventory: jsonb("kitchen_inventory").$type<KitchenInventory>(),
@@ -94,6 +98,7 @@ export const users = pgTable(
   },
   (table) => [
     index("idx_users_display_name").on(table.displayName),
+    index("idx_users_google_id").on(table.googleId),
   ]
 );
 
@@ -155,6 +160,25 @@ export const likes = pgTable(
   ]
 );
 
+export const verificationTokens = pgTable(
+  "verification_tokens",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    email: varchar("email", { length: 255 }).notNull(),
+    token: text("token").unique().notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_verification_tokens_token").on(table.token),
+    index("idx_verification_tokens_email").on(table.email),
+  ]
+);
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -162,3 +186,4 @@ export type Post = typeof posts.$inferSelect;
 export type NewPost = typeof posts.$inferInsert;
 export type Like = typeof likes.$inferSelect;
 export type NewLike = typeof likes.$inferInsert;
+export type VerificationToken = typeof verificationTokens.$inferSelect;

@@ -32,7 +32,7 @@ export async function generateCookingTip(
 
 export async function generateIngredientList(
   dishName: string,
-  servings: number
+  servings?: number
 ): Promise<Ingredient[] | null> {
   const client = getAnthropicClient();
   if (!client) return null;
@@ -41,11 +41,11 @@ export async function generateIngredientList(
     const message = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 1000,
-      system: `You are a world-class chef. Given a dish name and number of servings, return a complete ingredient list as a JSON array. Each ingredient must have: "name" (string), "quantity" (string, e.g. "2", "1/2", "200"), "unit" (string, e.g. "cups", "g", "tbsp", "whole", "to taste"). Be precise with quantities for the given serving count. Return ONLY the JSON array, no markdown, no explanation.`,
+      system: `You are a world-class chef. Given a dish name and optionally a number of servings, return a complete ingredient list as a JSON array. Each ingredient must have: "name" (string), "quantity" (string, e.g. "2", "1/2", "200"), "unit" (string, e.g. "cups", "g", "tbsp", "whole", "to taste"). Be precise with quantities for the given serving count. If no serving count is given, default to 4 servings. Return ONLY the JSON array, no markdown, no explanation.`,
       messages: [
         {
           role: "user",
-          content: `Dish: ${dishName}\nServings: ${servings}`,
+          content: `Dish: ${dishName}${servings ? `\nServings: ${servings}` : ""}`,
         },
       ],
     });
