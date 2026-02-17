@@ -6,13 +6,8 @@ import { eq } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-export async function updateAvatar(
-  _prevState: { error?: string; success?: boolean } | undefined,
-  formData: FormData
-) {
+export async function updateAvatar(avatarUrl: string) {
   const user = await requireAuth();
-
-  const avatarUrl = formData.get("avatarUrl") as string;
 
   if (!avatarUrl) {
     return { error: "No image provided" };
@@ -24,6 +19,7 @@ export async function updateAvatar(
     .where(eq(users.id, user.id));
 
   revalidatePath(`/profile/${user.username}`);
+  revalidatePath(`/profile/${user.username}/edit`);
   revalidatePath("/feed");
 
   return { success: true };

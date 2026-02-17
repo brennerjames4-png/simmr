@@ -1,13 +1,12 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState, useTransition } from "react";
 import { updateAvatar } from "@/actions/user";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UploadDropzone } from "@uploadthing/react";
 import type { OurFileRouter } from "@/lib/uploadthing";
-import { Camera, X } from "lucide-react";
+import { X } from "lucide-react";
 import { toast } from "sonner";
-import { useRef, useEffect } from "react";
 
 export function AvatarUploadForm({
   currentAvatarUrl,
@@ -17,48 +16,51 @@ export function AvatarUploadForm({
   displayName: string;
 }) {
   const [avatarUrl, setAvatarUrl] = useState(currentAvatarUrl ?? "");
-  const [state, action, isPending] = useActionState(updateAvatar, undefined);
-  const formRef = useRef<HTMLFormElement>(null);
-  const [justUploaded, setJustUploaded] = useState(false);
+  const [isSaving, startSaving] = useTransition();
 
-  // Auto-submit form when a new image is uploaded
-  useEffect(() => {
-    if (justUploaded && avatarUrl && formRef.current) {
-      formRef.current.requestSubmit();
-      setJustUploaded(false);
+  function handleUploadComplete(res: { ufsUrl: string; key: string }[]) {
+    if (res?.[0]) {
+      const url = res[0].ufsUrl;
+      setAvatarUrl(url);
+      startSaving(async () => {
+        const result = await updateAvatar(url);
+        if (result.error) {
+          toast.error(result.error);
+        } else {
+          toast.success("Profile photo updated!");
+        }
+      });
     }
-  }, [justUploaded, avatarUrl]);
-
-  // Show toast on success
-  useEffect(() => {
-    if (state?.success) {
-      toast.success("Profile photo updated!");
-    }
-    if (state?.error) {
-      toast.error(state.error);
-    }
-  }, [state]);
+  }
 
   return (
     <div className="flex flex-col items-center gap-6">
       {/* Current avatar preview */}
       <div className="relative">
         <Avatar className="h-28 w-28">
-          {avatarUrl && (
-            <AvatarImage src={avatarUrl} alt={displayName} />
-          )}
+          {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
           <AvatarFallback className="bg-primary/10 text-primary text-4xl">
             {displayName.charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        {avatarUrl && (
+        {avatarUrl && !isSaving && (
           <button
             type="button"
-            onClick={() => setAvatarUrl("")}
+            onClick={() => {
+              setAvatarUrl("");
+              startSaving(async () => {
+                await updateAvatar("");
+              });
+            }}
             className="absolute -top-1 -right-1 rounded-full bg-destructive p-1 text-white shadow-md hover:bg-destructive/90 transition-colors"
           >
             <X className="h-3.5 w-3.5" />
           </button>
+        )}
+        {isSaving && (
+          <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          </div>
         )}
       </div>
 
@@ -67,10 +69,7 @@ export function AvatarUploadForm({
         <UploadDropzone<OurFileRouter, "profileImage">
           endpoint="profileImage"
           onClientUploadComplete={(res) => {
-            if (res?.[0]) {
-              setAvatarUrl(res[0].ufsUrl);
-              setJustUploaded(true);
-            }
+            handleUploadComplete(res as { ufsUrl: string; key: string }[]);
           }}
           onUploadError={(error) => {
             toast.error("Upload failed: " + error.message);
@@ -82,11 +81,6 @@ export function AvatarUploadForm({
           }}
         />
       </div>
-
-      {/* Hidden form for server action */}
-      <form ref={formRef} action={action} className="hidden">
-        <input type="hidden" name="avatarUrl" value={avatarUrl} />
-      </form>
     </div>
   );
 }
