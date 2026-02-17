@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Clock, Sparkles, UtensilsCrossed } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { LikeButton } from "./like-button";
@@ -16,6 +16,9 @@ export function PostCard({ post }: { post: PostWithUser }) {
       <div className="flex items-center gap-3 p-4 pb-3">
         <Link href={`/profile/${post.user.username}`}>
           <Avatar className="h-9 w-9">
+            {post.user.avatarUrl && (
+              <AvatarImage src={post.user.avatarUrl} alt={post.user.displayName} />
+            )}
             <AvatarFallback className="bg-primary/10 text-primary text-sm">
               {post.user.displayName.charAt(0).toUpperCase()}
             </AvatarFallback>

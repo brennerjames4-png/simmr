@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { requireAuth } from "@/lib/auth";
 import { getPostById } from "@/queries/posts";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -64,6 +64,9 @@ export default async function PostDetailPage({
           className="flex items-center gap-3"
         >
           <Avatar className="h-10 w-10">
+            {post.user.avatarUrl && (
+              <AvatarImage src={post.user.avatarUrl} alt={post.user.displayName} />
+            )}
             <AvatarFallback className="bg-primary/10 text-primary">
               {post.user.displayName.charAt(0).toUpperCase()}
             </AvatarFallback>

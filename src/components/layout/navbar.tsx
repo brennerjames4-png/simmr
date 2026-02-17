@@ -3,7 +3,7 @@ import { PlusCircle, LogOut } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +31,9 @@ export function Navbar({ user }: { user: User }) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
                 <Avatar className="h-8 w-8">
+                  {user.avatarUrl && (
+                    <AvatarImage src={user.avatarUrl} alt={user.displayName} />
+                  )}
                   <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                     {user.displayName.charAt(0).toUpperCase()}
                   </AvatarFallback>

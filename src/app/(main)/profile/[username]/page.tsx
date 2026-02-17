@@ -3,11 +3,11 @@ import Link from "next/link";
 import { requireAuth } from "@/lib/auth";
 import { getUserByUsername } from "@/queries/users";
 import { getUserPosts } from "@/queries/posts";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { PostCard } from "@/components/feed/post-card";
-import { Calendar, ChefHat, Flame } from "lucide-react";
+import { Calendar, ChefHat, Flame, Pencil } from "lucide-react";
 import { format } from "date-fns";
 
 export default async function UserProfilePage({
@@ -27,11 +27,24 @@ export default async function UserProfilePage({
     <div className="space-y-6">
       {/* Profile Header */}
       <div className="flex flex-col items-center text-center space-y-4">
-        <Avatar className="h-20 w-20">
-          <AvatarFallback className="bg-primary/10 text-primary text-2xl">
-            {profile.displayName.charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+        <div className="relative">
+          <Avatar className="h-20 w-20">
+            {profile.avatarUrl && (
+              <AvatarImage src={profile.avatarUrl} alt={profile.displayName} />
+            )}
+            <AvatarFallback className="bg-primary/10 text-primary text-2xl">
+              {profile.displayName.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          {currentUser.id === profile.id && (
+            <Link
+              href={`/profile/${profile.username}/edit`}
+              className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md hover:bg-primary/90 transition-colors"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Link>
+          )}
+        </div>
         <div>
           <h1 className="text-2xl font-bold">{profile.displayName}</h1>
           <p className="text-muted-foreground">@{profile.username}</p>
