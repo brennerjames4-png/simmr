@@ -18,21 +18,6 @@ export function AvatarUploadForm({
   const [avatarUrl, setAvatarUrl] = useState(currentAvatarUrl ?? "");
   const [isSaving, startSaving] = useTransition();
 
-  function handleUploadComplete(res: { ufsUrl: string; key: string }[]) {
-    if (res?.[0]) {
-      const url = res[0].ufsUrl;
-      setAvatarUrl(url);
-      startSaving(async () => {
-        const result = await updateAvatar(url);
-        if (result.error) {
-          toast.error(result.error);
-        } else {
-          toast.success("Profile photo updated!");
-        }
-      });
-    }
-  }
-
   return (
     <div className="flex flex-col items-center gap-6">
       {/* Current avatar preview */}
@@ -69,10 +54,41 @@ export function AvatarUploadForm({
         <UploadDropzone<OurFileRouter, "profileImage">
           endpoint="profileImage"
           onClientUploadComplete={(res) => {
-            handleUploadComplete(res as { ufsUrl: string; key: string }[]);
+            console.log("UploadThing response:", JSON.stringify(res));
+            if (res && res.length > 0) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const file = res[0] as any;
+              const uploadedUrl = file.ufsUrl || file.url || "";
+              console.log("Uploaded URL:", uploadedUrl);
+
+              if (!uploadedUrl) {
+                toast.error("Upload succeeded but no URL returned");
+                return;
+              }
+
+              setAvatarUrl(uploadedUrl);
+              startSaving(async () => {
+                try {
+                  const result = await updateAvatar(uploadedUrl);
+                  if (result.error) {
+                    toast.error(result.error);
+                  } else {
+                    toast.success("Profile photo updated!");
+                  }
+                } catch (err) {
+                  console.error("Save avatar error:", err);
+                  toast.error("Failed to save profile photo");
+                }
+              });
+            }
           }}
           onUploadError={(error) => {
+            console.error("UploadThing error:", error);
             toast.error("Upload failed: " + error.message);
+          }}
+          onUploadBegin={() => {
+            console.log("Upload started...");
+            toast.info("Uploading...");
           }}
           className="border-dashed border-2 border-border rounded-lg p-6 ut-label:text-foreground ut-allowed-content:text-muted-foreground ut-button:bg-primary ut-button:text-primary-foreground"
           content={{
