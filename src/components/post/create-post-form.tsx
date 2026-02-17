@@ -23,12 +23,7 @@ export function CreatePostForm() {
   const [title, setTitle] = useState("");
   const [servings, setServings] = useState("");
 
-  const [state, action, isPending] = useActionState(
-    async (_prev: { error?: string } | undefined, formData: FormData) => {
-      return await createPost(formData);
-    },
-    undefined
-  );
+  const [state, action, isPending] = useActionState(createPost, undefined);
 
   function handleGenerateIngredients() {
     const servingsNum = parseInt(servings);

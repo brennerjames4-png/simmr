@@ -23,7 +23,10 @@ const createPostSchema = z.object({
   servings: z.coerce.number().int().positive().optional(),
 });
 
-export async function createPost(formData: FormData) {
+export async function createPost(
+  _prevState: { error?: string } | undefined,
+  formData: FormData
+) {
   const user = await requireAuth();
 
   const raw = {

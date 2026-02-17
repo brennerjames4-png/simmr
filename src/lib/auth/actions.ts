@@ -10,7 +10,10 @@ import { eq } from "drizzle-orm";
 
 const secret = new TextEncoder().encode(AUTH_SECRET);
 
-export async function signIn(formData: FormData) {
+export async function signIn(
+  _prevState: { error?: string } | undefined,
+  formData: FormData
+) {
   const username = formData.get("username") as string;
   const password = formData.get("password") as string;
 
@@ -27,7 +30,7 @@ export async function signIn(formData: FormData) {
   });
 
   if (!user) {
-    return { error: "User not found" };
+    return { error: "User not found in database" };
   }
 
   const token = await new SignJWT({ userId: user.id, username: user.username })

@@ -15,12 +15,7 @@ import {
 import { Flame } from "lucide-react";
 
 export default function LoginPage() {
-  const [state, action, isPending] = useActionState(
-    async (_prev: { error?: string } | undefined, formData: FormData) => {
-      return await signIn(formData);
-    },
-    undefined
-  );
+  const [state, action, isPending] = useActionState(signIn, undefined);
 
   return (
     <Card className="w-full max-w-sm">
