@@ -165,7 +165,6 @@ export function CreatePostForm() {
             id="cookTime"
             name="cookTime"
             type="number"
-            placeholder="30"
             min={1}
           />
         </div>
@@ -175,7 +174,6 @@ export function CreatePostForm() {
             id="servings"
             name="servings"
             type="number"
-            placeholder="4"
             min={1}
             value={servings}
             onChange={(e) => setServings(e.target.value)}
