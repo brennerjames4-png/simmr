@@ -38,18 +38,20 @@ export function PostCard({ post }: { post: PostWithUser }) {
         {post.difficulty && <DifficultyBadge difficulty={post.difficulty} />}
       </div>
 
-      {/* Image */}
-      <Link href={`/post/${post.id}`} className="block">
-        <div className="relative aspect-[4/3] w-full bg-muted">
-          <Image
-            src={post.imageUrl}
-            alt={post.title}
-            fill
-            className="object-cover"
-            sizes="(max-width: 672px) 100vw, 672px"
-          />
-        </div>
-      </Link>
+      {/* Image - only rendered if post has a photo */}
+      {post.imageUrl && (
+        <Link href={`/post/${post.id}`} className="block">
+          <div className="relative aspect-[4/3] w-full bg-muted">
+            <Image
+              src={post.imageUrl}
+              alt={post.title}
+              fill
+              className="object-cover"
+              sizes="(max-width: 672px) 100vw, 672px"
+            />
+          </div>
+        </Link>
+      )}
 
       {/* Content */}
       <div className="p-4 space-y-3">

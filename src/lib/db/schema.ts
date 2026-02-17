@@ -7,8 +7,63 @@ import {
   pgEnum,
   unique,
   index,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+
+// Ingredient type for post recipes
+export type Ingredient = {
+  name: string;
+  quantity: string;
+  unit: string;
+};
+
+// Kitchen inventory type for user profiles
+export type KitchenInventory = {
+  pots: { small: number; medium: number; large: number };
+  pans: { small: number; medium: number; large: number };
+  baking: {
+    baking_sheet: number;
+    cake_pan: number;
+    muffin_tin: number;
+    loaf_pan: number;
+    pie_dish: number;
+  };
+  appliances: {
+    oven: boolean;
+    microwave: boolean;
+    toaster: boolean;
+    blender: boolean;
+    food_processor: boolean;
+    stand_mixer: boolean;
+    slow_cooker: boolean;
+    pressure_cooker: boolean;
+    air_fryer: boolean;
+    grill: boolean;
+  };
+  prep_tools: {
+    cutting_boards: number;
+    mixing_bowls: boolean;
+    colander: boolean;
+    measuring_cups: boolean;
+    rolling_pin: boolean;
+    whisk: boolean;
+    tongs: boolean;
+    spatula: boolean;
+    ladle: boolean;
+    peeler: boolean;
+    grater: boolean;
+    mortar_and_pestle: boolean;
+  };
+  specialty: {
+    wok: boolean;
+    dutch_oven: boolean;
+    cast_iron_skillet: boolean;
+    griddle: boolean;
+    steamer: boolean;
+    deep_fryer: boolean;
+  };
+};
 
 export const difficultyEnum = pgEnum("difficulty_level", [
   "beginner",
@@ -27,6 +82,7 @@ export const users = pgTable("users", {
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   avatarUrl: text("avatar_url"),
   bio: text("bio"),
+  kitchenInventory: jsonb("kitchen_inventory").$type<KitchenInventory>(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -47,7 +103,7 @@ export const posts = pgTable(
     title: varchar("title", { length: 200 }).notNull(),
     description: text("description"),
     recipeNotes: text("recipe_notes"),
-    imageUrl: text("image_url").notNull(),
+    imageUrl: text("image_url"),
     imageKey: text("image_key"),
     tags: text("tags")
       .array()
@@ -55,6 +111,7 @@ export const posts = pgTable(
     cookTime: integer("cook_time"),
     difficulty: difficultyEnum("difficulty"),
     servings: integer("servings"),
+    ingredients: jsonb("ingredients").$type<Ingredient[]>(),
     aiTip: text("ai_tip"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

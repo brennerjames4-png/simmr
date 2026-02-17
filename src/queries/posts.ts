@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { posts, users, likes } from "@/lib/db/schema";
+import type { Ingredient } from "@/lib/db/schema";
 import { desc, eq, sql, and, lt, count } from "drizzle-orm";
 
 export type PostWithUser = {
@@ -7,12 +8,13 @@ export type PostWithUser = {
   title: string;
   description: string | null;
   recipeNotes: string | null;
-  imageUrl: string;
+  imageUrl: string | null;
   imageKey: string | null;
   tags: string[] | null;
   cookTime: number | null;
   difficulty: "beginner" | "intermediate" | "advanced" | "expert" | null;
   servings: number | null;
+  ingredients: Ingredient[] | null;
   aiTip: string | null;
   createdAt: Date;
   userId: string;
@@ -46,6 +48,7 @@ export async function getFeedPosts(
       cookTime: posts.cookTime,
       difficulty: posts.difficulty,
       servings: posts.servings,
+      ingredients: posts.ingredients,
       aiTip: posts.aiTip,
       createdAt: posts.createdAt,
       userId: posts.userId,
@@ -74,6 +77,7 @@ export async function getFeedPosts(
     cookTime: r.cookTime,
     difficulty: r.difficulty,
     servings: r.servings,
+    ingredients: r.ingredients ?? null,
     aiTip: r.aiTip,
     createdAt: r.createdAt,
     userId: r.userId,
@@ -103,6 +107,7 @@ export async function getPostById(
       cookTime: posts.cookTime,
       difficulty: posts.difficulty,
       servings: posts.servings,
+      ingredients: posts.ingredients,
       aiTip: posts.aiTip,
       createdAt: posts.createdAt,
       userId: posts.userId,
@@ -132,6 +137,7 @@ export async function getPostById(
     cookTime: r.cookTime,
     difficulty: r.difficulty,
     servings: r.servings,
+    ingredients: r.ingredients ?? null,
     aiTip: r.aiTip,
     createdAt: r.createdAt,
     userId: r.userId,
@@ -161,6 +167,7 @@ export async function getUserPosts(
       cookTime: posts.cookTime,
       difficulty: posts.difficulty,
       servings: posts.servings,
+      ingredients: posts.ingredients,
       aiTip: posts.aiTip,
       createdAt: posts.createdAt,
       userId: posts.userId,
@@ -188,6 +195,7 @@ export async function getUserPosts(
     cookTime: r.cookTime,
     difficulty: r.difficulty,
     servings: r.servings,
+    ingredients: r.ingredients ?? null,
     aiTip: r.aiTip,
     createdAt: r.createdAt,
     userId: r.userId,

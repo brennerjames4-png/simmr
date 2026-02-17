@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { requireAuth } from "@/lib/auth";
 import { getUserByUsername } from "@/queries/users";
 import { getUserPosts } from "@/queries/posts";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { PostCard } from "@/components/feed/post-card";
-import { Calendar, Flame } from "lucide-react";
+import { Calendar, ChefHat, Flame } from "lucide-react";
 import { format } from "date-fns";
 
 export default async function UserProfilePage({
@@ -54,6 +56,43 @@ export default async function UserProfilePage({
           </div>
         </div>
       </div>
+
+      {/* Kitchen Inventory CTA - only for profile owner */}
+      {currentUser.id === profile.id && (
+        <>
+          {!profile.kitchenInventory ? (
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <ChefHat className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">Set up your kitchen</p>
+                <p className="text-xs text-muted-foreground">
+                  Tell us what equipment you have for personalized dish
+                  recommendations.
+                </p>
+              </div>
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/profile/${profile.username}/kitchen`}>
+                  Set up
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <ChefHat className="h-4 w-4" />
+                <span>Kitchen inventory configured</span>
+              </div>
+              <Button asChild size="sm" variant="ghost">
+                <Link href={`/profile/${profile.username}/kitchen`}>
+                  Edit kitchen
+                </Link>
+              </Button>
+            </div>
+          )}
+        </>
+      )}
 
       <Separator />
 

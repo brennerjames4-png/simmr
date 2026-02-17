@@ -20,6 +20,7 @@ export async function getUserByUsername(
       passwordHash: users.passwordHash,
       avatarUrl: users.avatarUrl,
       bio: users.bio,
+      kitchenInventory: users.kitchenInventory,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
       postCount: sql<number>`count(distinct ${posts.id})::int`,

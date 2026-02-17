@@ -43,17 +43,19 @@ export default async function PostDetailPage({
         Back to feed
       </Link>
 
-      {/* Image */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-muted">
-        <Image
-          src={post.imageUrl}
-          alt={post.title}
-          fill
-          className="object-cover"
-          sizes="(max-width: 672px) 100vw, 672px"
-          priority
-        />
-      </div>
+      {/* Image - only rendered if post has a photo */}
+      {post.imageUrl && (
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-muted">
+          <Image
+            src={post.imageUrl}
+            alt={post.title}
+            fill
+            className="object-cover"
+            sizes="(max-width: 672px) 100vw, 672px"
+            priority
+          />
+        </div>
+      )}
 
       {/* User + Actions */}
       <div className="flex items-center justify-between">
@@ -135,6 +137,32 @@ export default async function PostDetailPage({
             </p>
           </div>
         </div>
+      )}
+
+      {/* Ingredients */}
+      {post.ingredients && post.ingredients.length > 0 && (
+        <>
+          <Separator />
+          <div>
+            <h2 className="text-lg font-semibold mb-3">Ingredients</h2>
+            <ul className="space-y-1.5">
+              {post.ingredients.map((ing, i) => (
+                <li
+                  key={i}
+                  className="flex items-baseline gap-2 text-sm text-muted-foreground"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 mt-1.5" />
+                  <span>
+                    <span className="text-foreground font-medium">
+                      {ing.quantity} {ing.unit}
+                    </span>{" "}
+                    {ing.name}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
       )}
 
       {/* Recipe Notes */}

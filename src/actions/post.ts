@@ -8,14 +8,16 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod/v4";
 import { generateCookingTip } from "@/lib/ai/cooking-tips";
+import type { Ingredient } from "@/lib/db/schema";
 
 const createPostSchema = z.object({
   title: z.string().min(1, "Title is required").max(200),
   description: z.string().optional(),
   recipeNotes: z.string().optional(),
-  imageUrl: z.string().url("Valid image URL is required"),
+  imageUrl: z.string().url().optional(),
   imageKey: z.string().optional(),
   tags: z.string().optional(),
+  ingredients: z.string().optional(),
   cookTime: z.coerce.number().int().positive().optional(),
   difficulty: z.enum(["beginner", "intermediate", "advanced", "expert"]).optional(),
   servings: z.coerce.number().int().positive().optional(),
@@ -28,9 +30,10 @@ export async function createPost(formData: FormData) {
     title: formData.get("title") as string,
     description: (formData.get("description") as string) || undefined,
     recipeNotes: (formData.get("recipeNotes") as string) || undefined,
-    imageUrl: formData.get("imageUrl") as string,
+    imageUrl: (formData.get("imageUrl") as string) || undefined,
     imageKey: (formData.get("imageKey") as string) || undefined,
     tags: (formData.get("tags") as string) || undefined,
+    ingredients: (formData.get("ingredients") as string) || undefined,
     cookTime: formData.get("cookTime") || undefined,
     difficulty: (formData.get("difficulty") as string) || undefined,
     servings: formData.get("servings") || undefined,
@@ -48,6 +51,16 @@ export async function createPost(formData: FormData) {
         .filter(Boolean)
     : [];
 
+  // Parse ingredients JSON from the form
+  let ingredientsList: Ingredient[] | null = null;
+  if (parsed.data.ingredients) {
+    try {
+      ingredientsList = JSON.parse(parsed.data.ingredients);
+    } catch {
+      // Ignore parse errors, ingredients are optional
+    }
+  }
+
   // Generate AI cooking tip (non-blocking - if it fails, post still works)
   const aiTip = await generateCookingTip(
     parsed.data.title,
@@ -61,12 +74,13 @@ export async function createPost(formData: FormData) {
       title: parsed.data.title,
       description: parsed.data.description || null,
       recipeNotes: parsed.data.recipeNotes || null,
-      imageUrl: parsed.data.imageUrl,
+      imageUrl: parsed.data.imageUrl || null,
       imageKey: parsed.data.imageKey || null,
       tags: tagArray,
       cookTime: parsed.data.cookTime || null,
       difficulty: parsed.data.difficulty || null,
       servings: parsed.data.servings || null,
+      ingredients: ingredientsList,
       aiTip,
     })
     .returning();
