@@ -44,34 +44,37 @@ export async function generateRecipe(
       return { error: "Failed to generate recipe. The AI service may be unavailable — please try again." };
     }
 
-    // Save to corpus (non-blocking)
-    saveToRecipeCorpus({
-      title: dishName,
-      ingredients: recipe.ingredients,
-      steps: recipe.steps,
-      servings: servings ?? null,
-      dietaryPreferences: user.dietaryPreferences,
-      foodExclusions: user.foodExclusions,
-      source: "full_recipe",
-      sourceUserId: user.id,
-    });
-
-    // Pre-cache cooking tip and skill extraction (non-blocking)
-    generateCookingTip(dishName).catch(() => {});
+    // Pre-cache: corpus write, cooking tip, and skill extraction — all in parallel
+    const preCacheTasks: Promise<unknown>[] = [
+      saveToRecipeCorpus({
+        title: dishName,
+        ingredients: recipe.ingredients,
+        steps: recipe.steps,
+        servings: servings ?? null,
+        dietaryPreferences: user.dietaryPreferences,
+        foodExclusions: user.foodExclusions,
+        source: "full_recipe",
+        sourceUserId: user.id,
+      }),
+      generateCookingTip(dishName),
+    ];
 
     if (recipe.steps && recipe.steps.length > 0) {
-      db.select({ name: skills.name })
-        .from(skills)
-        .then((existingSkills) => {
-          extractSkillsFromRecipe({
-            title: dishName,
-            steps: recipe.steps,
-            ingredients: recipe.ingredients,
-            existingSkillNames: existingSkills.map((s) => s.name),
-          }).catch(() => {});
-        })
-        .catch(() => {});
+      preCacheTasks.push(
+        db.select({ name: skills.name })
+          .from(skills)
+          .then((existingSkills) =>
+            extractSkillsFromRecipe({
+              title: dishName,
+              steps: recipe.steps,
+              ingredients: recipe.ingredients,
+              existingSkillNames: existingSkills.map((s) => s.name),
+            })
+          )
+      );
     }
+
+    await Promise.allSettled(preCacheTasks);
 
     return { recipe };
   } catch (error) {
@@ -116,34 +119,37 @@ export async function structureRecipe(
       return { error: "Failed to structure recipe. The AI service may be unavailable — please try again." };
     }
 
-    // Save to corpus (non-blocking)
-    saveToRecipeCorpus({
-      title: dishName,
-      ingredients: recipe.ingredients,
-      steps: recipe.steps,
-      servings: servings ?? null,
-      dietaryPreferences: user.dietaryPreferences,
-      foodExclusions: user.foodExclusions,
-      source: "structured_voice",
-      sourceUserId: user.id,
-    });
-
-    // Pre-cache cooking tip and skill extraction (non-blocking)
-    generateCookingTip(dishName).catch(() => {});
+    // Pre-cache: corpus write, cooking tip, and skill extraction — all in parallel
+    const preCacheTasks: Promise<unknown>[] = [
+      saveToRecipeCorpus({
+        title: dishName,
+        ingredients: recipe.ingredients,
+        steps: recipe.steps,
+        servings: servings ?? null,
+        dietaryPreferences: user.dietaryPreferences,
+        foodExclusions: user.foodExclusions,
+        source: "structured_voice",
+        sourceUserId: user.id,
+      }),
+      generateCookingTip(dishName),
+    ];
 
     if (recipe.steps && recipe.steps.length > 0) {
-      db.select({ name: skills.name })
-        .from(skills)
-        .then((existingSkills) => {
-          extractSkillsFromRecipe({
-            title: dishName,
-            steps: recipe.steps,
-            ingredients: recipe.ingredients,
-            existingSkillNames: existingSkills.map((s) => s.name),
-          }).catch(() => {});
-        })
-        .catch(() => {});
+      preCacheTasks.push(
+        db.select({ name: skills.name })
+          .from(skills)
+          .then((existingSkills) =>
+            extractSkillsFromRecipe({
+              title: dishName,
+              steps: recipe.steps,
+              ingredients: recipe.ingredients,
+              existingSkillNames: existingSkills.map((s) => s.name),
+            })
+          )
+      );
     }
+
+    await Promise.allSettled(preCacheTasks);
 
     return { recipe };
   } catch (error) {

@@ -69,39 +69,42 @@ export async function generateInspiration(
       };
     }
 
-    // Save to corpus (non-blocking)
-    saveToRecipeCorpus({
-      title: recipe.title,
-      description: recipe.description,
-      ingredients: recipe.ingredients,
-      steps: recipe.steps,
-      cookTime: recipe.cookTime,
-      difficulty: recipe.difficulty,
-      servings: recipe.servings,
-      dietaryPreferences: user.dietaryPreferences,
-      foodExclusions: user.foodExclusions,
-      appliancesUsed: recipe.equipmentUsed,
-      source: "inspiration",
-      sourceUserId: user.id,
-      inspirationMetadata: recipe,
-    });
-
-    // Pre-cache cooking tip and skill extraction (non-blocking — don't await)
-    generateCookingTip(recipe.title, recipe.description).catch(() => {});
+    // Pre-cache: corpus write, cooking tip, and skill extraction — all in parallel
+    const preCacheTasks: Promise<unknown>[] = [
+      saveToRecipeCorpus({
+        title: recipe.title,
+        description: recipe.description,
+        ingredients: recipe.ingredients,
+        steps: recipe.steps,
+        cookTime: recipe.cookTime,
+        difficulty: recipe.difficulty,
+        servings: recipe.servings,
+        dietaryPreferences: user.dietaryPreferences,
+        foodExclusions: user.foodExclusions,
+        appliancesUsed: recipe.equipmentUsed,
+        source: "inspiration",
+        sourceUserId: user.id,
+        inspirationMetadata: recipe,
+      }),
+      generateCookingTip(recipe.title, recipe.description),
+    ];
 
     if (recipe.steps && recipe.steps.length > 0) {
-      db.select({ name: skills.name })
-        .from(skills)
-        .then((existingSkills) => {
-          extractSkillsFromRecipe({
-            title: recipe.title,
-            steps: recipe.steps,
-            ingredients: recipe.ingredients.map(({ name, quantity, unit }) => ({ name, quantity, unit })),
-            existingSkillNames: existingSkills.map((s) => s.name),
-          }).catch(() => {});
-        })
-        .catch(() => {});
+      preCacheTasks.push(
+        db.select({ name: skills.name })
+          .from(skills)
+          .then((existingSkills) =>
+            extractSkillsFromRecipe({
+              title: recipe.title,
+              steps: recipe.steps,
+              ingredients: recipe.ingredients.map(({ name, quantity, unit }) => ({ name, quantity, unit })),
+              existingSkillNames: existingSkills.map((s) => s.name),
+            })
+          )
+      );
     }
+
+    await Promise.allSettled(preCacheTasks);
 
     return { recipe };
   } catch (error) {

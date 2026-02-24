@@ -35,8 +35,8 @@ export async function generateIngredients(
     return { error: "Failed to generate ingredients. Please try again." };
   }
 
-  // Save to corpus (non-blocking)
-  saveToRecipeCorpus({
+  // Save to corpus (awaited so Vercel doesn't kill the promise)
+  await saveToRecipeCorpus({
     title: dishName,
     ingredients,
     steps: [],
