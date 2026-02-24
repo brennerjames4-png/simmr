@@ -3,6 +3,8 @@ import Link from "next/link";
 import { requireAuth } from "@/lib/auth";
 import { getUserByUsername } from "@/queries/users";
 import { AvatarUploadForm } from "@/components/profile/avatar-upload-form";
+import { DisplayNameForm } from "@/components/profile/display-name-form";
+import { Separator } from "@/components/ui/separator";
 import { ArrowLeft } from "lucide-react";
 
 export default async function EditProfilePage({
@@ -34,13 +36,20 @@ export default async function EditProfilePage({
       <div className="text-center space-y-1">
         <h1 className="text-2xl font-bold">Edit Profile</h1>
         <p className="text-sm text-muted-foreground">
-          Update your profile photo
+          Update your profile photo and display name
         </p>
       </div>
 
       <AvatarUploadForm
         currentAvatarUrl={profile.avatarUrl}
         displayName={profile.displayName}
+      />
+
+      <Separator />
+
+      <DisplayNameForm
+        currentDisplayName={profile.displayName}
+        username={profile.username}
       />
     </div>
   );

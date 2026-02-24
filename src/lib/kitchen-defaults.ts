@@ -44,6 +44,7 @@ export const defaultKitchenInventory: KitchenInventory = {
     steamer: false,
     deep_fryer: false,
   },
+  customEquipment: [],
 };
 
 // Human-readable labels for all kitchen items
@@ -92,6 +93,32 @@ export const kitchenLabels: Record<string, Record<string, string>> = {
     deep_fryer: "Deep Fryer",
   },
 };
+
+/**
+ * Build a reverse lookup: lowercase label → { category, key, type }
+ * Used to match user-typed custom items against existing pre-made items
+ */
+export function buildLabelLookup(): Map<
+  string,
+  { category: string; key: string; type: "boolean" | "number" }
+> {
+  const lookup = new Map<
+    string,
+    { category: string; key: string; type: "boolean" | "number" }
+  >();
+
+  for (const [category, labels] of Object.entries(kitchenLabels)) {
+    const defaults = defaultKitchenInventory[
+      category as keyof KitchenInventory
+    ] as Record<string, number | boolean>;
+    for (const [key, label] of Object.entries(labels)) {
+      const type = typeof defaults[key] === "boolean" ? "boolean" : "number";
+      lookup.set(label.toLowerCase(), { category, key, type });
+    }
+  }
+
+  return lookup;
+}
 
 export const categoryLabels: Record<string, string> = {
   pots: "Pots",

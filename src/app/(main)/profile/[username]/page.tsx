@@ -1,14 +1,22 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireAuth } from "@/lib/auth";
-import { getUserByUsername } from "@/queries/users";
+import {
+  getUserProfileWithFollowStats,
+  getRelationshipState,
+  canViewUserContent,
+} from "@/queries/follows";
 import { getUserPosts } from "@/queries/posts";
+import { getUserSkillCount, getUserTotalSkillCount } from "@/queries/skills";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { PostCard } from "@/components/feed/post-card";
-import { Calendar, ChefHat, Flame, Pencil } from "lucide-react";
+import { FollowButton } from "@/components/follow/follow-button";
+import { ProfileStats } from "@/components/profile/profile-stats";
+import { Calendar, ChefHat, Flame, Leaf, Lock, Pencil, Settings, Sparkles } from "lucide-react";
 import { format } from "date-fns";
+import { getDietaryLabel } from "@/lib/dietary-config";
 
 export default async function UserProfilePage({
   params,
@@ -17,11 +25,24 @@ export default async function UserProfilePage({
 }) {
   const currentUser = await requireAuth();
   const { username } = await params;
-  const profile = await getUserByUsername(username);
+  const profile = await getUserProfileWithFollowStats(username);
 
   if (!profile) notFound();
 
-  const posts = await getUserPosts(username, currentUser.id);
+  const isOwnProfile = currentUser.id === profile.id;
+  const relationship = isOwnProfile
+    ? "none" as const
+    : await getRelationshipState(currentUser.id, profile.id);
+  const canView = await canViewUserContent(currentUser.id, profile.id);
+
+  // Only fetch posts if the viewer can see them
+  const posts = canView ? await getUserPosts(username, currentUser.id) : [];
+  const [skillCount, totalSkillCount] = canView
+    ? await Promise.all([
+        getUserSkillCount(profile.id),
+        getUserTotalSkillCount(profile.id),
+      ])
+    : [0, 0];
 
   return (
     <div className="space-y-6">
@@ -36,7 +57,7 @@ export default async function UserProfilePage({
               {profile.displayName.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          {currentUser.id === profile.id && (
+          {isOwnProfile && (
             <Link
               href={`/profile/${profile.username}/edit`}
               className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md hover:bg-primary/90 transition-colors"
@@ -46,32 +67,60 @@ export default async function UserProfilePage({
           )}
         </div>
         <div>
-          <h1 className="text-2xl font-bold">{profile.displayName}</h1>
+          <div className="flex items-center justify-center gap-2">
+            <h1 className="text-2xl font-bold">{profile.displayName}</h1>
+            {isOwnProfile && (
+              <Link
+                href={`/profile/${profile.username}/settings`}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Settings className="h-4 w-4" />
+              </Link>
+            )}
+          </div>
           <p className="text-muted-foreground">@{profile.username}</p>
+          {profile.isPrivate && (
+            <div className="flex items-center justify-center gap-1 mt-1 text-xs text-muted-foreground">
+              <Lock className="h-3 w-3" />
+              <span>Private account</span>
+            </div>
+          )}
         </div>
         {profile.bio && (
           <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
             {profile.bio}
           </p>
         )}
-        <div className="flex items-center gap-6 text-sm">
-          <div className="text-center">
-            <p className="font-bold text-lg">{profile.postCount}</p>
-            <p className="text-muted-foreground">Posts</p>
-          </div>
-          <div className="text-center">
-            <p className="font-bold text-lg">{profile.totalLikes}</p>
-            <p className="text-muted-foreground">Likes</p>
-          </div>
-          <div className="flex items-center gap-1 text-muted-foreground">
-            <Calendar className="h-4 w-4" />
-            <span>Joined {format(new Date(profile.createdAt), "MMM yyyy")}</span>
-          </div>
+
+        {/* Follow Button */}
+        {!isOwnProfile && (
+          <FollowButton
+            targetUserId={profile.id}
+            relationship={relationship}
+            isOwnProfile={false}
+          />
+        )}
+
+        {/* Profile Stats */}
+        <ProfileStats
+          username={profile.username}
+          postCount={profile.postCount}
+          totalLikes={profile.totalLikes}
+          followerCount={profile.followerCount}
+          followingCount={profile.followingCount}
+          simmrCount={profile.simmrCount}
+        />
+
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Calendar className="h-3.5 w-3.5" />
+          <span>
+            Joined {format(new Date(profile.createdAt), "MMM yyyy")}
+          </span>
         </div>
       </div>
 
       {/* Kitchen Inventory CTA - only for profile owner */}
-      {currentUser.id === profile.id && (
+      {isOwnProfile && (
         <>
           {!profile.kitchenInventory ? (
             <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center gap-4">
@@ -107,10 +156,86 @@ export default async function UserProfilePage({
         </>
       )}
 
+      {/* Dietary Preferences & Food Exclusions */}
+      {(() => {
+        const hasDietary = profile.dietaryPreferences && profile.dietaryPreferences.length > 0;
+        const hasExclusions = profile.foodExclusions && profile.foodExclusions.length > 0;
+        const hasAny = hasDietary || hasExclusions;
+
+        if (isOwnProfile) {
+          const parts: string[] = [];
+          if (hasDietary) parts.push(profile.dietaryPreferences!.map((p) => getDietaryLabel(p)).join(", "));
+          if (hasExclusions) parts.push(`Avoids: ${profile.foodExclusions!.join(", ")}`);
+
+          return (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
+                <Leaf className="h-4 w-4 shrink-0" />
+                <span className="truncate">
+                  {hasAny ? parts.join(" · ") : "No dietary preferences set"}
+                </span>
+              </div>
+              <Button asChild size="sm" variant="ghost" className="shrink-0">
+                <Link href={`/profile/${profile.username}/dietary`}>
+                  {hasAny ? "Edit" : "Set up"}
+                </Link>
+              </Button>
+            </div>
+          );
+        }
+
+        if (!hasAny) return null;
+
+        return (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Leaf className="h-4 w-4 shrink-0" />
+            <span>
+              {[
+                hasDietary && profile.dietaryPreferences!.map((p) => getDietaryLabel(p)).join(", "),
+                hasExclusions && `Avoids: ${profile.foodExclusions!.join(", ")}`,
+              ].filter(Boolean).join(" · ")}
+            </span>
+          </div>
+        );
+      })()}
+
+      {/* Cooking Skills Link */}
+      {canView && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Sparkles className="h-4 w-4" />
+            <span>
+              {totalSkillCount > 0
+                ? skillCount > 0
+                  ? `${skillCount} mastered${totalSkillCount - skillCount > 0 ? `, ${totalSkillCount - skillCount} in progress` : ""}`
+                  : `${totalSkillCount} skill${totalSkillCount !== 1 ? "s" : ""} in progress`
+                : isOwnProfile
+                  ? "No skills yet — publish a recipe to start!"
+                  : "No skills earned yet"}
+            </span>
+          </div>
+          <Button asChild size="sm" variant="ghost">
+            <Link href={`/profile/${profile.username}/skills`}>
+              {totalSkillCount > 0 ? "View skills" : "View"}
+            </Link>
+          </Button>
+        </div>
+      )}
+
       <Separator />
 
-      {/* User Posts */}
-      {posts.length === 0 ? (
+      {/* User Posts — gated by privacy */}
+      {!canView ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted mb-3">
+            <Lock className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <p className="font-semibold">This account is private</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Follow this user to see their posts.
+          </p>
+        </div>
+      ) : posts.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 mb-3">
             <Flame className="h-6 w-6 text-primary" />

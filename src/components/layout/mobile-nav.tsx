@@ -5,7 +5,11 @@ import { usePathname } from "next/navigation";
 import { mobileNavItems } from "@/config/nav";
 import { cn } from "@/lib/utils";
 
-export function MobileNav() {
+interface MobileNavProps {
+  notificationCount?: number;
+}
+
+export function MobileNav({ notificationCount = 0 }: MobileNavProps) {
   const pathname = usePathname();
 
   return (
@@ -17,13 +21,14 @@ export function MobileNav() {
             (item.href !== "/feed" && pathname.startsWith(item.href));
           const Icon = item.icon;
           const isCreate = item.label === "Create";
+          const isActivity = item.label === "Activity";
 
           return (
             <Link
               key={item.label}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-1 px-3 py-1 text-xs transition-colors",
+                "relative flex flex-col items-center gap-1 px-3 py-1 text-xs transition-colors",
                 isCreate
                   ? "text-primary"
                   : isActive
@@ -31,7 +36,14 @@ export function MobileNav() {
                     : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Icon className={cn("h-5 w-5", isCreate && "h-6 w-6")} />
+              <div className="relative">
+                <Icon className={cn("h-5 w-5", isCreate && "h-6 w-6")} />
+                {isActivity && notificationCount > 0 && (
+                  <span className="absolute -top-1 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[8px] font-bold text-primary-foreground">
+                    {notificationCount > 9 ? "9+" : notificationCount}
+                  </span>
+                )}
+              </div>
               <span>{item.label}</span>
             </Link>
           );

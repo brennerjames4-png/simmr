@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { posts, users, likes } from "@/lib/db/schema";
-import type { Ingredient } from "@/lib/db/schema";
+import type { Ingredient, RecipeStep, InspirationRecipe } from "@/lib/db/schema";
 import { desc, eq, sql, and, lt, count } from "drizzle-orm";
 
 export type PostWithUser = {
@@ -15,7 +15,11 @@ export type PostWithUser = {
   difficulty: "beginner" | "intermediate" | "advanced" | "expert" | null;
   servings: number | null;
   ingredients: Ingredient[] | null;
+  steps: RecipeStep[] | null;
   aiTip: string | null;
+  status: "draft" | "published";
+  source: string;
+  aiRecipe: InspirationRecipe | null;
   createdAt: Date;
   userId: string;
   user: {
@@ -25,6 +29,7 @@ export type PostWithUser = {
   };
   likeCount: number;
   isLiked: boolean;
+  isSimmr: boolean;
 };
 
 export async function getFeedPosts(
@@ -32,9 +37,34 @@ export async function getFeedPosts(
   cursor?: string,
   limit = 10
 ): Promise<PostWithUser[]> {
-  const conditions = cursor
-    ? lt(posts.createdAt, new Date(cursor))
-    : undefined;
+  const whereConditions = [
+    // Only show published posts in feed
+    eq(posts.status, "published"),
+    // Privacy filter: show own posts, public users' posts, or accepted follows' posts
+    sql`(
+      ${posts.userId} = ${currentUserId}
+      OR ${users.isPrivate} = false
+      OR EXISTS (
+        SELECT 1 FROM follows
+        WHERE follows.follower_id = ${currentUserId}
+        AND follows.following_id = ${posts.userId}
+        AND follows.status = 'accepted'
+      )
+    )`,
+    // Block filter: exclude blocked users in both directions
+    sql`NOT EXISTS (
+      SELECT 1 FROM follows
+      WHERE follows.status = 'blocked'
+      AND (
+        (follows.follower_id = ${currentUserId} AND follows.following_id = ${posts.userId})
+        OR (follows.follower_id = ${posts.userId} AND follows.following_id = ${currentUserId})
+      )
+    )`,
+  ];
+
+  if (cursor) {
+    whereConditions.push(lt(posts.createdAt, new Date(cursor)));
+  }
 
   const results = await db
     .select({
@@ -49,7 +79,11 @@ export async function getFeedPosts(
       difficulty: posts.difficulty,
       servings: posts.servings,
       ingredients: posts.ingredients,
+      steps: posts.steps,
       aiTip: posts.aiTip,
+      status: posts.status,
+      source: posts.source,
+      aiRecipe: posts.aiRecipe,
       createdAt: posts.createdAt,
       userId: posts.userId,
       username: users.username,
@@ -57,11 +91,19 @@ export async function getFeedPosts(
       avatarUrl: users.avatarUrl,
       likeCount: sql<number>`count(${likes.id})::int`,
       isLiked: sql<boolean>`bool_or(${likes.userId} = ${currentUserId})`,
+      isSimmr: sql<boolean>`EXISTS (
+        SELECT 1 FROM follows f1
+        JOIN follows f2 ON f1.follower_id = f2.following_id AND f1.following_id = f2.follower_id
+        WHERE f1.follower_id = ${currentUserId}
+        AND f1.following_id = ${posts.userId}
+        AND f1.status = 'accepted'
+        AND f2.status = 'accepted'
+      )`,
     })
     .from(posts)
     .innerJoin(users, eq(posts.userId, users.id))
     .leftJoin(likes, eq(likes.postId, posts.id))
-    .where(conditions)
+    .where(and(...whereConditions))
     .groupBy(posts.id, users.id)
     .orderBy(desc(posts.createdAt))
     .limit(limit);
@@ -78,7 +120,11 @@ export async function getFeedPosts(
     difficulty: r.difficulty,
     servings: r.servings,
     ingredients: r.ingredients ?? null,
+    steps: r.steps ?? null,
     aiTip: r.aiTip,
+    status: r.status,
+    source: r.source,
+    aiRecipe: r.aiRecipe ?? null,
     createdAt: r.createdAt,
     userId: r.userId,
     user: {
@@ -88,6 +134,7 @@ export async function getFeedPosts(
     },
     likeCount: r.likeCount ?? 0,
     isLiked: r.isLiked ?? false,
+    isSimmr: r.isSimmr ?? false,
   }));
 }
 
@@ -108,7 +155,11 @@ export async function getPostById(
       difficulty: posts.difficulty,
       servings: posts.servings,
       ingredients: posts.ingredients,
+      steps: posts.steps,
       aiTip: posts.aiTip,
+      status: posts.status,
+      source: posts.source,
+      aiRecipe: posts.aiRecipe,
       createdAt: posts.createdAt,
       userId: posts.userId,
       username: users.username,
@@ -116,6 +167,14 @@ export async function getPostById(
       avatarUrl: users.avatarUrl,
       likeCount: sql<number>`count(${likes.id})::int`,
       isLiked: sql<boolean>`bool_or(${likes.userId} = ${currentUserId})`,
+      isSimmr: sql<boolean>`EXISTS (
+        SELECT 1 FROM follows f1
+        JOIN follows f2 ON f1.follower_id = f2.following_id AND f1.following_id = f2.follower_id
+        WHERE f1.follower_id = ${currentUserId}
+        AND f1.following_id = ${posts.userId}
+        AND f1.status = 'accepted'
+        AND f2.status = 'accepted'
+      )`,
     })
     .from(posts)
     .innerJoin(users, eq(posts.userId, users.id))
@@ -138,7 +197,11 @@ export async function getPostById(
     difficulty: r.difficulty,
     servings: r.servings,
     ingredients: r.ingredients ?? null,
+    steps: r.steps ?? null,
     aiTip: r.aiTip,
+    status: r.status,
+    source: r.source,
+    aiRecipe: r.aiRecipe ?? null,
     createdAt: r.createdAt,
     userId: r.userId,
     user: {
@@ -148,6 +211,7 @@ export async function getPostById(
     },
     likeCount: r.likeCount ?? 0,
     isLiked: r.isLiked ?? false,
+    isSimmr: r.isSimmr ?? false,
   };
 }
 
@@ -168,7 +232,11 @@ export async function getUserPosts(
       difficulty: posts.difficulty,
       servings: posts.servings,
       ingredients: posts.ingredients,
+      steps: posts.steps,
       aiTip: posts.aiTip,
+      status: posts.status,
+      source: posts.source,
+      aiRecipe: posts.aiRecipe,
       createdAt: posts.createdAt,
       userId: posts.userId,
       username: users.username,
@@ -176,11 +244,19 @@ export async function getUserPosts(
       avatarUrl: users.avatarUrl,
       likeCount: sql<number>`count(${likes.id})::int`,
       isLiked: sql<boolean>`bool_or(${likes.userId} = ${currentUserId})`,
+      isSimmr: sql<boolean>`EXISTS (
+        SELECT 1 FROM follows f1
+        JOIN follows f2 ON f1.follower_id = f2.following_id AND f1.following_id = f2.follower_id
+        WHERE f1.follower_id = ${currentUserId}
+        AND f1.following_id = ${posts.userId}
+        AND f1.status = 'accepted'
+        AND f2.status = 'accepted'
+      )`,
     })
     .from(posts)
     .innerJoin(users, eq(posts.userId, users.id))
     .leftJoin(likes, eq(likes.postId, posts.id))
-    .where(eq(users.username, username))
+    .where(and(eq(users.username, username), eq(posts.status, "published")))
     .groupBy(posts.id, users.id)
     .orderBy(desc(posts.createdAt));
 
@@ -196,7 +272,11 @@ export async function getUserPosts(
     difficulty: r.difficulty,
     servings: r.servings,
     ingredients: r.ingredients ?? null,
+    steps: r.steps ?? null,
     aiTip: r.aiTip,
+    status: r.status,
+    source: r.source,
+    aiRecipe: r.aiRecipe ?? null,
     createdAt: r.createdAt,
     userId: r.userId,
     user: {
@@ -206,5 +286,6 @@ export async function getUserPosts(
     },
     likeCount: r.likeCount ?? 0,
     isLiked: r.isLiked ?? false,
+    isSimmr: r.isSimmr ?? false,
   }));
 }

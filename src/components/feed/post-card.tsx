@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { LikeButton } from "./like-button";
 import { DifficultyBadge } from "@/components/shared/difficulty-badge";
+import { SimmrBadge } from "@/components/follow/simmr-badge";
 import { formatDistanceToNow } from "date-fns";
 import type { PostWithUser } from "@/queries/posts";
 
@@ -25,12 +26,15 @@ export function PostCard({ post }: { post: PostWithUser }) {
           </Avatar>
         </Link>
         <div className="flex-1 min-w-0">
-          <Link
-            href={`/profile/${post.user.username}`}
-            className="text-sm font-semibold hover:underline"
-          >
-            {post.user.displayName}
-          </Link>
+          <div className="flex items-center gap-1.5">
+            <Link
+              href={`/profile/${post.user.username}`}
+              className="text-sm font-semibold hover:underline"
+            >
+              {post.user.displayName}
+            </Link>
+            {post.isSimmr && <SimmrBadge />}
+          </div>
           <p className="text-xs text-muted-foreground">
             @{post.user.username} &middot;{" "}
             {formatDistanceToNow(new Date(post.createdAt), {

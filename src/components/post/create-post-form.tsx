@@ -1,47 +1,86 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { createPost } from "@/actions/post";
-import { generateIngredients } from "@/actions/ingredients";
+import { createPost, updateDraft } from "@/actions/post";
+import { regenerateSteps } from "@/actions/recipe-ai";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { UploadDropzone } from "@uploadthing/react";
 import type { OurFileRouter } from "@/lib/uploadthing";
-import type { Ingredient } from "@/lib/db/schema";
-import { Loader2, Plus, Sparkles, Trash2, X } from "lucide-react";
+import type { Ingredient, RecipeStep, GeneratedRecipe } from "@/lib/db/schema";
+import { Loader2, Plus, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
 import Image from "next/image";
-import { toast } from "sonner";
+import { AiGenerateModal } from "./ai-generate-modal";
+import { RecipeStepsEditor } from "./recipe-steps-editor";
 
-export function CreatePostForm() {
-  const [imageUrl, setImageUrl] = useState("");
-  const [imageKey, setImageKey] = useState("");
-  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [isGenerating, startGenerating] = useTransition();
-  const [title, setTitle] = useState("");
-  const [servings, setServings] = useState("");
+export type DraftData = {
+  id: string;
+  title: string;
+  description: string | null;
+  recipeNotes: string | null;
+  imageUrl: string | null;
+  imageKey: string | null;
+  tags: string[] | null;
+  cookTime: number | null;
+  difficulty: "beginner" | "intermediate" | "advanced" | "expert" | null;
+  servings: number | null;
+  ingredients: Ingredient[] | null;
+  steps: RecipeStep[] | null;
+};
 
-  const [state, action, isPending] = useActionState(createPost, undefined);
+interface CreatePostFormProps {
+  draft?: DraftData;
+}
 
-  function handleGenerateIngredients() {
-    const servingsNum = servings ? parseInt(servings) : undefined;
-    if (!title.trim()) {
-      toast.error("Enter a dish name first");
-      return;
-    }
+export function CreatePostForm({ draft }: CreatePostFormProps) {
+  const isEditing = !!draft;
 
-    startGenerating(async () => {
-      const result = await generateIngredients(
+  const [imageUrl, setImageUrl] = useState(draft?.imageUrl ?? "");
+  const [imageKey, setImageKey] = useState(draft?.imageKey ?? "");
+  const [ingredients, setIngredients] = useState<Ingredient[]>(
+    draft?.ingredients ?? []
+  );
+  const [steps, setSteps] = useState<RecipeStep[]>(draft?.steps ?? []);
+  const [title, setTitle] = useState(draft?.title ?? "");
+  const [description, setDescription] = useState(draft?.description ?? "");
+  const [recipeNotes, setRecipeNotes] = useState(draft?.recipeNotes ?? "");
+  const [servings, setServings] = useState(
+    draft?.servings ? String(draft.servings) : ""
+  );
+  const [cookTime, setCookTime] = useState(
+    draft?.cookTime ? String(draft.cookTime) : ""
+  );
+  const [difficulty, setDifficulty] = useState(draft?.difficulty ?? "");
+  const [tags, setTags] = useState(draft?.tags?.join(", ") ?? "");
+  const [showAiModal, setShowAiModal] = useState(false);
+
+  const [state, action, isPending] = useActionState(
+    isEditing ? updateDraft : createPost,
+    undefined
+  );
+  const [isRegenerating, startRegeneration] = useTransition();
+
+  function handleRecipeGenerated(recipe: GeneratedRecipe) {
+    setIngredients(recipe.ingredients);
+    setSteps(recipe.steps);
+  }
+
+  function handleRegenerateSteps() {
+    const validIngredients = ingredients.filter((i) => i.name.trim());
+    if (validIngredients.length === 0) return;
+
+    startRegeneration(async () => {
+      const servingsNum = servings ? parseInt(servings) : undefined;
+      const result = await regenerateSteps(
         title,
+        validIngredients,
         servingsNum && servingsNum >= 1 ? servingsNum : undefined
       );
-      if (result.error) {
-        toast.error(result.error);
-      } else if (result.ingredients) {
-        setIngredients(result.ingredients);
-        toast.success("Ingredients generated!");
+      if (result.steps) {
+        setSteps(result.steps);
       }
     });
   }
@@ -66,6 +105,8 @@ export function CreatePostForm() {
 
   return (
     <form action={action} className="space-y-6">
+      {isEditing && <input type="hidden" name="postId" value={draft.id} />}
+
       {state?.error && (
         <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
           {state.error}
@@ -142,6 +183,8 @@ export function CreatePostForm() {
           name="description"
           placeholder="Tell the story behind this dish..."
           rows={3}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
         />
       </div>
 
@@ -153,6 +196,8 @@ export function CreatePostForm() {
           name="recipeNotes"
           placeholder="Share your technique, tips, or full recipe..."
           rows={4}
+          value={recipeNotes}
+          onChange={(e) => setRecipeNotes(e.target.value)}
         />
       </div>
 
@@ -165,6 +210,8 @@ export function CreatePostForm() {
             name="cookTime"
             type="number"
             min={1}
+            value={cookTime}
+            onChange={(e) => setCookTime(e.target.value)}
           />
         </div>
         <div className="space-y-2">
@@ -183,6 +230,8 @@ export function CreatePostForm() {
           <select
             id="difficulty"
             name="difficulty"
+            value={difficulty}
+            onChange={(e) => setDifficulty(e.target.value)}
             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <option value="">Select...</option>
@@ -202,20 +251,11 @@ export function CreatePostForm() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={handleGenerateIngredients}
-            disabled={isGenerating || !title.trim()}
+            onClick={() => setShowAiModal(true)}
+            disabled={!title.trim()}
           >
-            {isGenerating ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                Generate with AI
-              </>
-            )}
+            <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+            Generate with AI
           </Button>
         </div>
 
@@ -284,16 +324,69 @@ export function CreatePostForm() {
         {ingredients.length === 0 && (
           <p className="text-xs text-muted-foreground">
             Fill in the dish name, then click &quot;Generate with AI&quot; to
-            auto-create an ingredient list.
+            auto-create a recipe with ingredients and steps.
           </p>
         )}
       </div>
 
-      {/* Hidden field for ingredients JSON */}
+      {/* Steps Section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label>Steps</Label>
+          {ingredients.filter((i) => i.name.trim()).length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleRegenerateSteps}
+              disabled={isRegenerating || !title.trim()}
+            >
+              {isRegenerating ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  Update Steps
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+        {steps.length > 0 ? (
+          <RecipeStepsEditor steps={steps} onChange={setSteps} />
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Steps will appear here after AI generation, or add them manually.
+          </p>
+        )}
+        {steps.length === 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              setSteps([{ step_number: 1, instruction: "" }])
+            }
+          >
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            Add step
+          </Button>
+        )}
+      </div>
+
+      {/* Hidden fields for ingredients and steps JSON */}
       <input
         type="hidden"
         name="ingredients"
         value={ingredients.length > 0 ? JSON.stringify(ingredients) : ""}
+      />
+      <input
+        type="hidden"
+        name="steps"
+        value={steps.length > 0 ? JSON.stringify(steps) : ""}
       />
 
       {/* Tags */}
@@ -303,12 +396,36 @@ export function CreatePostForm() {
           id="tags"
           name="tags"
           placeholder="pasta, italian, quick (comma separated)"
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
         />
       </div>
 
       <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? "Publishing..." : "Publish"}
+        {isPending
+          ? isEditing
+            ? "Saving..."
+            : "Publishing..."
+          : isEditing
+            ? "Save Draft"
+            : "Publish"}
       </Button>
+
+      {/* AI Generation Modal */}
+      <AiGenerateModal
+        open={showAiModal}
+        onOpenChange={setShowAiModal}
+        dishName={title}
+        servings={
+          servings
+            ? (() => {
+                const n = parseInt(servings);
+                return !isNaN(n) && n >= 1 ? n : undefined;
+              })()
+            : undefined
+        }
+        onRecipeGenerated={handleRecipeGenerated}
+      />
     </form>
   );
 }

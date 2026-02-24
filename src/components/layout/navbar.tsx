@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { PlusCircle, LogOut, Search } from "lucide-react";
+import { PlusCircle, LogOut, Search, Settings } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "./theme-toggle";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -32,6 +33,7 @@ export function Navbar({ user }: { user: User }) {
               <span className="sr-only">Create post</span>
             </Link>
           </Button>
+          <NotificationBell userId={user.id} />
           <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -49,6 +51,15 @@ export function Navbar({ user }: { user: User }) {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem asChild>
                 <Link href={`/profile/${user.username}`}>Profile</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link
+                  href={`/profile/${user.username}/settings`}
+                  className="flex items-center gap-2"
+                >
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>

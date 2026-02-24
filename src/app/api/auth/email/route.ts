@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
   // Send email via Resend
   const resendApiKey = process.env.RESEND_API_KEY;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = process.env.APP_URL || "http://localhost:3000";
   const magicLink = `${appUrl}/api/auth/email/verify?token=${token}`;
 
   if (resendApiKey) {

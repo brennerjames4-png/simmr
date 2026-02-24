@@ -21,7 +21,7 @@ export async function GET() {
     path: "/",
   });
 
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/google/callback`;
+  const redirectUri = `${process.env.APP_URL}/api/auth/google/callback`;
 
   const params = new URLSearchParams({
     client_id: clientId,

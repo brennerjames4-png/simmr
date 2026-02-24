@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { LikeButton } from "@/components/feed/like-button";
 import { DifficultyBadge } from "@/components/shared/difficulty-badge";
 import { deletePost } from "@/actions/post";
+import { PublishButton } from "./publish-button";
 import {
   ArrowLeft,
   Clock,
@@ -32,6 +33,11 @@ export default async function PostDetailPage({
 
   const isOwner = post.userId === user.id;
 
+  // Draft posts are only visible to their owner
+  if (post.status === "draft" && !isOwner) {
+    notFound();
+  }
+
   return (
     <div className="space-y-6">
       {/* Back button */}
@@ -42,6 +48,29 @@ export default async function PostDetailPage({
         <ArrowLeft className="h-4 w-4" />
         Back to feed
       </Link>
+
+      {/* Draft banner */}
+      {post.status === "draft" && isOwner && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950 p-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Badge
+              variant="outline"
+              className="text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-700"
+            >
+              Draft
+            </Badge>
+            <span className="text-sm text-muted-foreground">
+              This recipe hasn&apos;t been published yet.
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/post/${post.id}/edit`}>Edit</Link>
+            </Button>
+            <PublishButton postId={post.id} />
+          </div>
+        </div>
+      )}
 
       {/* Image - only rendered if post has a photo */}
       {post.imageUrl && (
@@ -164,6 +193,36 @@ export default async function PostDetailPage({
                 </li>
               ))}
             </ul>
+          </div>
+        </>
+      )}
+
+      {/* Steps */}
+      {post.steps && post.steps.length > 0 && (
+        <>
+          <Separator />
+          <div>
+            <h2 className="text-lg font-semibold mb-3">Steps</h2>
+            <ol className="space-y-3">
+              {post.steps.map((step) => (
+                <li key={step.step_number} className="flex gap-3 text-sm">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                    {step.step_number}
+                  </span>
+                  <div className="flex-1">
+                    <p className="text-muted-foreground leading-relaxed">
+                      {step.instruction}
+                    </p>
+                    {step.duration_minutes && (
+                      <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground/70">
+                        <Clock className="h-3 w-3" />
+                        {step.duration_minutes} min
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ol>
           </div>
         </>
       )}
