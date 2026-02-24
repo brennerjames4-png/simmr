@@ -1,14 +1,18 @@
 "use server";
 
 import { requireAuth } from "@/lib/auth";
+import { db } from "@/lib/db";
 import {
   generateFullRecipe,
+  generateCookingTip,
   structureRecipeFromDescription,
   regenerateStepsFromIngredients,
 } from "@/lib/ai/cooking-tips";
+import { extractSkillsFromRecipe } from "@/lib/ai/skills";
 import { enforceAIRateLimitForUser } from "@/lib/rate-limit";
 import { saveToRecipeCorpus } from "@/lib/corpus";
 import type { GeneratedRecipe, Ingredient, RecipeStep } from "@/lib/db/schema";
+import { skills } from "@/lib/db/schema";
 
 export async function generateRecipe(
   dishName: string,
@@ -51,6 +55,23 @@ export async function generateRecipe(
       source: "full_recipe",
       sourceUserId: user.id,
     });
+
+    // Pre-cache cooking tip and skill extraction (non-blocking)
+    generateCookingTip(dishName).catch(() => {});
+
+    if (recipe.steps && recipe.steps.length > 0) {
+      db.select({ name: skills.name })
+        .from(skills)
+        .then((existingSkills) => {
+          extractSkillsFromRecipe({
+            title: dishName,
+            steps: recipe.steps,
+            ingredients: recipe.ingredients,
+            existingSkillNames: existingSkills.map((s) => s.name),
+          }).catch(() => {});
+        })
+        .catch(() => {});
+    }
 
     return { recipe };
   } catch (error) {
@@ -106,6 +127,23 @@ export async function structureRecipe(
       source: "structured_voice",
       sourceUserId: user.id,
     });
+
+    // Pre-cache cooking tip and skill extraction (non-blocking)
+    generateCookingTip(dishName).catch(() => {});
+
+    if (recipe.steps && recipe.steps.length > 0) {
+      db.select({ name: skills.name })
+        .from(skills)
+        .then((existingSkills) => {
+          extractSkillsFromRecipe({
+            title: dishName,
+            steps: recipe.steps,
+            ingredients: recipe.ingredients,
+            existingSkillNames: existingSkills.map((s) => s.name),
+          }).catch(() => {});
+        })
+        .catch(() => {});
+    }
 
     return { recipe };
   } catch (error) {

@@ -6,6 +6,7 @@ import type { RecipeStep, Ingredient, SkillTier, SkillCategory } from "@/lib/db/
 import { eq, and, sql } from "drizzle-orm";
 import { extractSkillsFromRecipe } from "@/lib/ai/skills";
 import { MASTERY_THRESHOLDS } from "@/lib/skills-config";
+import { getCachedSkillExtraction } from "@/lib/corpus";
 
 /**
  * Extract skills from a recipe and allocate them to the user.
@@ -36,8 +37,9 @@ export async function allocateSkills(params: {
       existingSkills.map((s) => [s.name.toLowerCase(), s])
     );
 
-    // 2. Ask AI to extract skills from the recipe
-    const extracted = await extractSkillsFromRecipe({
+    // 2. Check cache first, then fall back to AI extraction
+    const cachedSkills = await getCachedSkillExtraction(params.steps);
+    const extracted = cachedSkills ?? await extractSkillsFromRecipe({
       title: params.title,
       steps: params.steps,
       ingredients: params.ingredients,

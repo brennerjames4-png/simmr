@@ -10,6 +10,7 @@ import { z } from "zod/v4";
 import { generateCookingTip } from "@/lib/ai/cooking-tips";
 import { allocateSkills, deallocateSkills } from "@/actions/skills";
 import { deleteUploadthingFile } from "@/lib/uploadthing-cleanup";
+import { getCachedCookingTip } from "@/lib/corpus";
 import type { Ingredient, RecipeStep } from "@/lib/db/schema";
 
 const createPostSchema = z.object({
@@ -78,11 +79,9 @@ export async function createPost(
     }
   }
 
-  // Generate AI cooking tip (non-blocking - if it fails, post still works)
-  const aiTip = await generateCookingTip(
-    parsed.data.title,
-    parsed.data.description
-  );
+  // Check cache for cooking tip first, fall back to fresh generation
+  const aiTip = await getCachedCookingTip(parsed.data.title)
+    ?? await generateCookingTip(parsed.data.title, parsed.data.description);
 
   const [post] = await db
     .insert(posts)

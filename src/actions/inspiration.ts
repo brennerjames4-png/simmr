@@ -16,11 +16,13 @@ import {
   regenerateRecipeSteps,
 } from "@/lib/ai/inspiration";
 import { generateCookingTip } from "@/lib/ai/cooking-tips";
+import { extractSkillsFromRecipe } from "@/lib/ai/skills";
 import { allocateSkills } from "@/actions/skills";
 import { getRecentMeals } from "@/queries/inspiration";
 import { getUserSkillsForAI } from "@/queries/skills";
 import { enforceAIRateLimitForUser } from "@/lib/rate-limit";
-import { saveToRecipeCorpus } from "@/lib/corpus";
+import { saveToRecipeCorpus, getCachedCookingTip } from "@/lib/corpus";
+import { skills } from "@/lib/db/schema";
 
 export async function generateInspiration(
   ingredients: string,
@@ -83,6 +85,23 @@ export async function generateInspiration(
       sourceUserId: user.id,
       inspirationMetadata: recipe,
     });
+
+    // Pre-cache cooking tip and skill extraction (non-blocking — don't await)
+    generateCookingTip(recipe.title, recipe.description).catch(() => {});
+
+    if (recipe.steps && recipe.steps.length > 0) {
+      db.select({ name: skills.name })
+        .from(skills)
+        .then((existingSkills) => {
+          extractSkillsFromRecipe({
+            title: recipe.title,
+            steps: recipe.steps,
+            ingredients: recipe.ingredients.map(({ name, quantity, unit }) => ({ name, quantity, unit })),
+            existingSkillNames: existingSkills.map((s) => s.name),
+          }).catch(() => {});
+        })
+        .catch(() => {});
+    }
 
     return { recipe };
   } catch (error) {
@@ -206,9 +225,10 @@ export async function publishDraft(
     return { error: "This post is already published." };
   }
 
-  // Generate an AI cooking tip for the published post
+  // Check cache for cooking tip first, fall back to fresh generation
   // NOTE: Not rate limited — this is a post-publish side effect, not a user-initiated AI request
-  const aiTip = await generateCookingTip(post.title, post.description ?? undefined);
+  const aiTip = await getCachedCookingTip(post.title)
+    ?? await generateCookingTip(post.title, post.description ?? undefined);
 
   await db
     .update(posts)

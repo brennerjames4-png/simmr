@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   recipeCorpus,
@@ -230,5 +231,39 @@ export async function saveToSkillExtractionCache(
       .onConflictDoNothing({ target: skillExtractionCache.stepsHash });
   } catch (error) {
     console.error("Skill extraction cache write failed (non-blocking):", error);
+  }
+}
+
+export async function getCachedCookingTip(
+  dishName: string
+): Promise<string | null> {
+  try {
+    const dishNameNormalized = normalizeDishName(dishName);
+    const cached = await db.query.cookingTipsCache.findFirst({
+      where: eq(cookingTipsCache.dishNameNormalized, dishNameNormalized),
+      orderBy: (table, { desc }) => [desc(table.createdAt)],
+    });
+    return cached?.tipText ?? null;
+  } catch (error) {
+    console.error("Cooking tips cache lookup failed:", error);
+    return null;
+  }
+}
+
+export async function getCachedSkillExtraction(
+  steps: RecipeStep[]
+): Promise<ExtractedSkill[] | null> {
+  try {
+    const stepsHash = createHash("sha256")
+      .update(JSON.stringify(steps))
+      .digest("hex");
+    const cached = await db.query.skillExtractionCache.findFirst({
+      where: eq(skillExtractionCache.stepsHash, stepsHash),
+    });
+    if (!cached) return null;
+    return cached.extractedSkills as ExtractedSkill[];
+  } catch (error) {
+    console.error("Skill extraction cache lookup failed:", error);
+    return null;
   }
 }
