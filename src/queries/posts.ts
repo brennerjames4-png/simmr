@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { posts, users, likes } from "@/lib/db/schema";
+import { posts, users, likes, collectionItems, collections } from "@/lib/db/schema";
 import type { Ingredient, RecipeStep, InspirationRecipe } from "@/lib/db/schema";
 import { desc, eq, sql, and, lt, count } from "drizzle-orm";
 
@@ -30,6 +30,7 @@ export type PostWithUser = {
   likeCount: number;
   isLiked: boolean;
   isSimmr: boolean;
+  isSaved: boolean;
 };
 
 export async function getFeedPosts(
@@ -99,6 +100,11 @@ export async function getFeedPosts(
         AND f1.status = 'accepted'
         AND f2.status = 'accepted'
       )`,
+      isSaved: sql<boolean>`EXISTS (
+        SELECT 1 FROM collection_items ci
+        JOIN collections c ON ci.collection_id = c.id
+        WHERE ci.post_id = ${posts.id} AND c.user_id = ${currentUserId}
+      )`,
     })
     .from(posts)
     .innerJoin(users, eq(posts.userId, users.id))
@@ -135,6 +141,7 @@ export async function getFeedPosts(
     likeCount: r.likeCount ?? 0,
     isLiked: r.isLiked ?? false,
     isSimmr: r.isSimmr ?? false,
+    isSaved: r.isSaved ?? false,
   }));
 }
 
@@ -175,6 +182,11 @@ export async function getPostById(
         AND f1.status = 'accepted'
         AND f2.status = 'accepted'
       )`,
+      isSaved: sql<boolean>`EXISTS (
+        SELECT 1 FROM collection_items ci
+        JOIN collections c ON ci.collection_id = c.id
+        WHERE ci.post_id = ${posts.id} AND c.user_id = ${currentUserId}
+      )`,
     })
     .from(posts)
     .innerJoin(users, eq(posts.userId, users.id))
@@ -212,6 +224,7 @@ export async function getPostById(
     likeCount: r.likeCount ?? 0,
     isLiked: r.isLiked ?? false,
     isSimmr: r.isSimmr ?? false,
+    isSaved: r.isSaved ?? false,
   };
 }
 
@@ -252,6 +265,11 @@ export async function getUserPosts(
         AND f1.status = 'accepted'
         AND f2.status = 'accepted'
       )`,
+      isSaved: sql<boolean>`EXISTS (
+        SELECT 1 FROM collection_items ci
+        JOIN collections c ON ci.collection_id = c.id
+        WHERE ci.post_id = ${posts.id} AND c.user_id = ${currentUserId}
+      )`,
     })
     .from(posts)
     .innerJoin(users, eq(posts.userId, users.id))
@@ -287,5 +305,6 @@ export async function getUserPosts(
     likeCount: r.likeCount ?? 0,
     isLiked: r.isLiked ?? false,
     isSimmr: r.isSimmr ?? false,
+    isSaved: r.isSaved ?? false,
   }));
 }

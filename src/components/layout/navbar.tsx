@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PlusCircle, LogOut, Search, Settings } from "lucide-react";
+import { PlusCircle, LogOut, Search, Settings, CalendarDays, ShoppingCart, Bookmark } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "./theme-toggle";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -27,6 +27,24 @@ export function Navbar({ user }: { user: User }) {
               <span className="sr-only">Search users</span>
             </Link>
           </Button>
+          <Button asChild variant="ghost" size="icon" className="hidden md:inline-flex">
+            <Link href="/meal-planner">
+              <CalendarDays className="h-5 w-5" />
+              <span className="sr-only">Meal Planner</span>
+            </Link>
+          </Button>
+          <Button asChild variant="ghost" size="icon" className="hidden md:inline-flex">
+            <Link href="/shopping">
+              <ShoppingCart className="h-5 w-5" />
+              <span className="sr-only">Shopping Lists</span>
+            </Link>
+          </Button>
+          <Button asChild variant="ghost" size="icon" className="hidden md:inline-flex">
+            <Link href="/collections">
+              <Bookmark className="h-5 w-5" />
+              <span className="sr-only">Collections</span>
+            </Link>
+          </Button>
           <Button asChild variant="ghost" size="icon">
             <Link href="/post/new">
               <PlusCircle className="h-5 w-5" />
@@ -51,6 +69,24 @@ export function Navbar({ user }: { user: User }) {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem asChild>
                 <Link href={`/profile/${user.username}`}>Profile</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/meal-planner" className="flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4" />
+                  Meal Planner
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/shopping" className="flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  Shopping Lists
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/collections" className="flex items-center gap-2">
+                  <Bookmark className="h-4 w-4" />
+                  Collections
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link

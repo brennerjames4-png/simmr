@@ -86,7 +86,7 @@ export function PostCard({ post }: { post: PostWithUser }) {
               <span>{post.servings} servings</span>
             </div>
           )}
-          <SaveButton postId={post.id} initialSaved={false} />
+          <SaveButton postId={post.id} initialSaved={post.isSaved} />
         </div>
 
         {/* Title + Description */}
