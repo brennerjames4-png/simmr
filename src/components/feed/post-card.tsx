@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { LikeButton } from "./like-button";
+import { SaveButton } from "@/components/collections/save-button";
 import { DifficultyBadge } from "@/components/shared/difficulty-badge";
 import { SimmrBadge } from "@/components/follow/simmr-badge";
 import { formatDistanceToNow } from "date-fns";
@@ -85,6 +86,7 @@ export function PostCard({ post }: { post: PostWithUser }) {
               <span>{post.servings} servings</span>
             </div>
           )}
+          <SaveButton postId={post.id} initialSaved={false} />
         </div>
 
         {/* Title + Description */}

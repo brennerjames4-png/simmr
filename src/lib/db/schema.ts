@@ -166,6 +166,10 @@ export const users = pgTable(
       .array()
       .default(sql`'{}'`),
     bypassCode: varchar("bypass_code", { length: 100 }),
+    currentStreak: integer("current_streak").default(0).notNull(),
+    longestStreak: integer("longest_streak").default(0).notNull(),
+    lastPublishDate: varchar("last_publish_date", { length: 10 }),
+    totalPublished: integer("total_published").default(0).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -430,6 +434,212 @@ export const skillExtractionCache = pgTable(
   ]
 );
 
+// Corpus analytics for tracking hit rates
+export const corpusAnalytics = pgTable(
+  "corpus_analytics",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    endpoint: varchar("endpoint", { length: 50 }).notNull(),
+    servedFrom: varchar("served_from", { length: 20 }).notNull(),
+    dishNameNormalized: varchar("dish_name_normalized", { length: 200 }),
+    userId: text("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_corpus_analytics_endpoint_served_created").on(
+      table.endpoint,
+      table.servedFrom,
+      table.createdAt
+    ),
+  ]
+);
+
+// Meal plans
+export const mealPlans = pgTable(
+  "meal_plans",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    weekStart: timestamp("week_start", { withTimezone: true }).notNull(),
+    planData: jsonb("plan_data").$type<MealPlanDay[]>().notNull(),
+    preferences: jsonb("preferences"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_meal_plans_user_week").on(table.userId, table.weekStart),
+    index("idx_meal_plans_user_created").on(table.userId, table.createdAt),
+  ]
+);
+
+// Shopping lists
+export const shoppingLists = pgTable(
+  "shopping_lists",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 100 }).notNull(),
+    items: jsonb("items").$type<ShoppingListItem[]>().notNull(),
+    sourceRecipeIds: text("source_recipe_ids")
+      .array()
+      .default(sql`'{}'`),
+    isCompleted: boolean("is_completed").default(false).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_shopping_lists_user_created").on(table.userId, table.createdAt),
+  ]
+);
+
+// Recipe collections
+export const collections = pgTable(
+  "collections",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 100 }).notNull(),
+    description: text("description"),
+    isDefault: boolean("is_default").default(false).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("collections_user_name_unique").on(table.userId, table.name),
+    index("idx_collections_user_created").on(table.userId, table.createdAt),
+  ]
+);
+
+export const collectionItems = pgTable(
+  "collection_items",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    collectionId: text("collection_id")
+      .notNull()
+      .references(() => collections.id, { onDelete: "cascade" }),
+    postId: text("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    addedAt: timestamp("added_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("collection_items_collection_post_unique").on(
+      table.collectionId,
+      table.postId
+    ),
+    index("idx_collection_items_collection_added").on(
+      table.collectionId,
+      table.addedAt
+    ),
+  ]
+);
+
+// User badges
+export const userBadges = pgTable(
+  "user_badges",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    badgeType: varchar("badge_type", { length: 50 }).notNull(),
+    earnedAt: timestamp("earned_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    metadata: jsonb("metadata"),
+  },
+  (table) => [
+    unique("user_badges_user_type_unique").on(table.userId, table.badgeType),
+    index("idx_user_badges_user_earned").on(table.userId, table.earnedAt),
+  ]
+);
+
+// Meal plan types
+export type MealPlanDay = {
+  day:
+    | "monday"
+    | "tuesday"
+    | "wednesday"
+    | "thursday"
+    | "friday"
+    | "saturday"
+    | "sunday";
+  recipe: {
+    title: string;
+    description: string;
+    ingredients: Ingredient[];
+    steps: RecipeStep[];
+    cookTime: number;
+    difficulty: "beginner" | "intermediate" | "advanced" | "expert";
+    servings: number;
+    dietaryNotes: string | null;
+  };
+  source: "corpus" | "ai";
+};
+
+export type MealPlan = {
+  id: string;
+  weekStart: Date;
+  days: MealPlanDay[];
+  createdAt: Date;
+};
+
+// Shopping list types
+export type ShoppingListItem = {
+  name: string;
+  quantity: string;
+  unit: string;
+  category: string;
+  checked: boolean;
+  sourceRecipes: string[];
+};
+
+export type ShoppingList = {
+  id: string;
+  name: string;
+  items: ShoppingListItem[];
+  sourceRecipeIds: string[] | null;
+  isCompleted: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -450,3 +660,9 @@ export type CookingTipCache = typeof cookingTipsCache.$inferSelect;
 export type NewCookingTipCache = typeof cookingTipsCache.$inferInsert;
 export type SkillExtractionCache = typeof skillExtractionCache.$inferSelect;
 export type NewSkillExtractionCache = typeof skillExtractionCache.$inferInsert;
+export type CorpusAnalyticsEntry = typeof corpusAnalytics.$inferSelect;
+export type MealPlanRow = typeof mealPlans.$inferSelect;
+export type ShoppingListRow = typeof shoppingLists.$inferSelect;
+export type Collection = typeof collections.$inferSelect;
+export type CollectionItem = typeof collectionItems.$inferSelect;
+export type UserBadge = typeof userBadges.$inferSelect;

@@ -3,7 +3,6 @@
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { redirect } from "next/navigation";
 import {
   getOnboardingSession,
   clearOnboardingSession,
@@ -76,5 +75,6 @@ export async function completeOnboarding(
 
   await clearOnboardingSession();
   await createSession(newUser.id, newUser.username);
-  redirect("/feed");
+
+  return { success: true, username: newUser.username };
 }

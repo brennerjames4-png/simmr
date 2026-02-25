@@ -17,6 +17,8 @@ import { ProfileStats } from "@/components/profile/profile-stats";
 import { Calendar, ChefHat, Flame, Leaf, Lock, Pencil, Settings, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { getDietaryLabel } from "@/lib/dietary-config";
+import { getUserBadges } from "@/lib/badges";
+import { BADGE_DEFINITIONS, type BadgeType } from "@/lib/badges-config";
 
 export default async function UserProfilePage({
   params,
@@ -37,12 +39,13 @@ export default async function UserProfilePage({
 
   // Only fetch posts if the viewer can see them
   const posts = canView ? await getUserPosts(username, currentUser.id) : [];
-  const [skillCount, totalSkillCount] = canView
+  const [skillCount, totalSkillCount, badges] = canView
     ? await Promise.all([
         getUserSkillCount(profile.id),
         getUserTotalSkillCount(profile.id),
+        getUserBadges(profile.id),
       ])
-    : [0, 0];
+    : [0, 0, []];
 
   return (
     <div className="space-y-6">
@@ -110,6 +113,33 @@ export default async function UserProfilePage({
           followingCount={profile.followingCount}
           simmrCount={profile.simmrCount}
         />
+
+        {/* Streak */}
+        {profile.currentStreak > 0 && (
+          <div className="flex items-center gap-1 text-sm">
+            <Flame className="h-4 w-4 text-orange-500" />
+            <span className="font-semibold">{profile.currentStreak} day streak</span>
+          </div>
+        )}
+
+        {/* Badges */}
+        {badges.length > 0 && (
+          <div className="flex flex-wrap gap-1 justify-center">
+            {badges.map((b) => {
+              const def = BADGE_DEFINITIONS[b.badgeType as BadgeType];
+              if (!def) return null;
+              return (
+                <span
+                  key={b.badgeType}
+                  className="text-lg cursor-default"
+                  title={`${def.name} — ${def.description}`}
+                >
+                  {def.icon}
+                </span>
+              );
+            })}
+          </div>
+        )}
 
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Calendar className="h-3.5 w-3.5" />

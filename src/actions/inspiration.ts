@@ -20,8 +20,10 @@ import { extractSkillsFromRecipe } from "@/lib/ai/skills";
 import { allocateSkills } from "@/actions/skills";
 import { getRecentMeals } from "@/queries/inspiration";
 import { getUserSkillsForAI } from "@/queries/skills";
-import { enforceAIRateLimitForUser } from "@/lib/rate-limit";
-import { saveToRecipeCorpus, getCachedCookingTip } from "@/lib/corpus";
+import { enforceAIRateLimitForUser, isRateLimitBypassed } from "@/lib/rate-limit";
+import { saveToRecipeCorpus, getCachedCookingTip, getCorpusInspirationRecipe, trackCorpusEvent } from "@/lib/corpus";
+import { updateStreak, checkAndAwardBadges } from "@/lib/badges";
+import { BADGE_DEFINITIONS } from "@/lib/badges-config";
 import { skills } from "@/lib/db/schema";
 
 export async function generateInspiration(
@@ -43,6 +45,23 @@ export async function generateInspiration(
   }
 
   const safeServings = servings >= 1 && servings <= 20 ? servings : 2;
+
+  // Corpus-first: non-bypass users get cached inspiration recipes when available
+  // Only works when the user requests a specific dish by name (not free-form ingredient lists)
+  if (!isRateLimitBypassed(user.bypassCode ?? null) && !previousRecipes?.length) {
+    const cached = await getCorpusInspirationRecipe(
+      ingredients,
+      safeServings,
+      {
+        dietaryPreferences: user.dietaryPreferences,
+        foodExclusions: user.foodExclusions,
+      }
+    );
+    if (cached) {
+      void trackCorpusEvent({ endpoint: "inspiration", servedFrom: "corpus", dishNameNormalized: ingredients, userId: user.id });
+      return { recipe: cached };
+    }
+  }
 
   try {
     const [recentMeals, userSkills] = await Promise.all([
@@ -87,6 +106,7 @@ export async function generateInspiration(
         inspirationMetadata: recipe,
       }),
       generateCookingTip(recipe.title, recipe.description),
+      trackCorpusEvent({ endpoint: "inspiration", servedFrom: "api", dishNameNormalized: recipe.title, userId: user.id }),
     ];
 
     if (recipe.steps && recipe.steps.length > 0) {
@@ -213,7 +233,7 @@ export async function saveDraft(
 
 export async function publishDraft(
   postId: string
-): Promise<{ success?: boolean; error?: string }> {
+): Promise<{ success?: boolean; error?: string; masteredSkills?: string[]; newBadges?: string[] }> {
   const user = await requireAuth();
 
   const post = await db.query.posts.findFirst({
@@ -230,8 +250,14 @@ export async function publishDraft(
 
   // Check cache for cooking tip first, fall back to fresh generation
   // NOTE: Not rate limited — this is a post-publish side effect, not a user-initiated AI request
-  const aiTip = await getCachedCookingTip(post.title)
-    ?? await generateCookingTip(post.title, post.description ?? undefined);
+  const cachedTip = await getCachedCookingTip(post.title);
+  const aiTip = cachedTip ?? await generateCookingTip(post.title, post.description ?? undefined);
+  void trackCorpusEvent({
+    endpoint: "cooking_tip",
+    servedFrom: cachedTip ? "corpus" : "api",
+    dishNameNormalized: post.title,
+    userId: user.id,
+  });
 
   await db
     .update(posts)
@@ -243,21 +269,32 @@ export async function publishDraft(
     .where(eq(posts.id, postId));
 
   // Allocate cooking skills from the recipe steps
+  let masteredSkills: string[] = [];
   if (post.steps && (post.steps as RecipeStep[]).length > 0) {
-    await allocateSkills({
+    const skillResult = await allocateSkills({
       userId: user.id,
       postId: post.id,
       title: post.title,
       steps: post.steps as RecipeStep[],
       ingredients: (post.ingredients as Ingredient[]) ?? [],
     });
+    masteredSkills = skillResult.masteredSkills;
   }
+
+  // Update streak and check badges
+  const streakResult = await updateStreak(user.id);
+  const badgeResults = await checkAndAwardBadges(user.id);
+  const allNewBadges = [...streakResult.newBadges, ...badgeResults];
 
   revalidatePath("/feed");
   revalidatePath("/drafts");
   revalidatePath(`/post/${postId}`);
 
-  return { success: true };
+  return {
+    success: true,
+    masteredSkills: masteredSkills.length > 0 ? masteredSkills : undefined,
+    newBadges: allNewBadges.length > 0 ? allNewBadges : undefined,
+  };
 }
 
 export async function deleteDraft(

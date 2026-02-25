@@ -10,11 +10,11 @@ import type { SkillTier, SkillCategory } from "@/lib/db/schema";
 import { MASTERY_THRESHOLDS } from "@/lib/skills-config";
 import { formatDistanceToNow } from "date-fns";
 
-const categoryConfig: Record<SkillCategory, { label: string }> = {
-  technique: { label: "Techniques" },
-  knife_work: { label: "Knife Work" },
-  baking_pastry: { label: "Baking & Pastry" },
-  specialty: { label: "Specialty" },
+const categoryConfig: Record<SkillCategory, { label: string; color: string }> = {
+  technique: { label: "Techniques", color: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
+  knife_work: { label: "Knife Work", color: "bg-red-500/10 text-red-600 border-red-500/20" },
+  baking_pastry: { label: "Baking & Pastry", color: "bg-amber-500/10 text-amber-600 border-amber-500/20" },
+  specialty: { label: "Specialty", color: "bg-purple-500/10 text-purple-600 border-purple-500/20" },
 };
 
 const categoryOrder: SkillCategory[] = [
@@ -128,6 +128,10 @@ export function SkillsDisplay({ skills, isOwner }: SkillsDisplayProps) {
                         {skill.description}
                       </p>
                     )}
+                    {/* Category badge */}
+                    <span className={`inline-block text-xs px-2 py-0.5 rounded-full border w-fit ${categoryConfig[skill.category]?.color ?? ""}`}>
+                      {categoryConfig[skill.category]?.label ?? skill.category}
+                    </span>
                     {/* Progress bar */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-xs">
@@ -144,6 +148,9 @@ export function SkillsDisplay({ skills, isOwner }: SkillsDisplayProps) {
                           style={{ width: `${progress * 100}%` }}
                         />
                       </div>
+                      <p className="text-xs text-muted-foreground">
+                        {threshold - skill.practiceCount} more {threshold - skill.practiceCount === 1 ? "recipe" : "recipes"} to mastery
+                      </p>
                     </div>
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>
@@ -164,6 +171,28 @@ export function SkillsDisplay({ skills, isOwner }: SkillsDisplayProps) {
                   </Card>
                 );
               })}
+          </div>
+        </div>
+      )}
+
+      {/* Tier Progression Summary */}
+      {isOwner && skills.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold">Tier Progress</h2>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {(Object.keys(tierConfig) as SkillTier[]).map((tier) => {
+              const tierSkills = skills.filter((s) => s.tier === tier);
+              const tierMastered = tierSkills.filter((s) => s.mastered).length;
+              if (tierSkills.length === 0) return null;
+              return (
+                <div key={tier} className="flex items-center gap-2 text-sm">
+                  <SkillTierBadge tier={tier} />
+                  <span className="text-muted-foreground">
+                    {tierMastered} of {tierSkills.length} mastered
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

@@ -9,6 +9,12 @@ import {
   recipeCorpus,
   cookingTipsCache,
   skillExtractionCache,
+  corpusAnalytics,
+  mealPlans,
+  shoppingLists,
+  collections,
+  collectionItems,
+  userBadges,
 } from "./schema";
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -18,6 +24,10 @@ export const usersRelations = relations(users, ({ many }) => ({
   following: many(follows, { relationName: "follower" }),
   userSkills: many(userSkills),
   corpusEntries: many(recipeCorpus),
+  mealPlans: many(mealPlans),
+  shoppingLists: many(shoppingLists),
+  collections: many(collections),
+  badges: many(userBadges),
 }));
 
 export const postsRelations = relations(posts, ({ one, many }) => ({
@@ -27,6 +37,7 @@ export const postsRelations = relations(posts, ({ one, many }) => ({
   }),
   likes: many(likes),
   userSkills: many(userSkills),
+  collectionItems: many(collectionItems),
 }));
 
 export const likesRelations = relations(likes, ({ one }) => ({
@@ -82,3 +93,50 @@ export const recipeCorpusRelations = relations(recipeCorpus, ({ one }) => ({
 export const cookingTipsCacheRelations = relations(cookingTipsCache, () => ({}));
 
 export const skillExtractionCacheRelations = relations(skillExtractionCache, () => ({}));
+
+export const corpusAnalyticsRelations = relations(corpusAnalytics, ({ one }) => ({
+  user: one(users, {
+    fields: [corpusAnalytics.userId],
+    references: [users.id],
+  }),
+}));
+
+export const mealPlansRelations = relations(mealPlans, ({ one }) => ({
+  user: one(users, {
+    fields: [mealPlans.userId],
+    references: [users.id],
+  }),
+}));
+
+export const shoppingListsRelations = relations(shoppingLists, ({ one }) => ({
+  user: one(users, {
+    fields: [shoppingLists.userId],
+    references: [users.id],
+  }),
+}));
+
+export const collectionsRelations = relations(collections, ({ one, many }) => ({
+  user: one(users, {
+    fields: [collections.userId],
+    references: [users.id],
+  }),
+  items: many(collectionItems),
+}));
+
+export const collectionItemsRelations = relations(collectionItems, ({ one }) => ({
+  collection: one(collections, {
+    fields: [collectionItems.collectionId],
+    references: [collections.id],
+  }),
+  post: one(posts, {
+    fields: [collectionItems.postId],
+    references: [posts.id],
+  }),
+}));
+
+export const userBadgesRelations = relations(userBadges, ({ one }) => ({
+  user: one(users, {
+    fields: [userBadges.userId],
+    references: [users.id],
+  }),
+}));

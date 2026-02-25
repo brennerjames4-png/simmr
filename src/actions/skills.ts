@@ -25,7 +25,8 @@ export async function allocateSkills(params: {
   title: string;
   steps: RecipeStep[];
   ingredients: Ingredient[];
-}): Promise<void> {
+}): Promise<{ masteredSkills: string[] }> {
+  const masteredSkills: string[] = [];
   try {
     // 1. Get all existing skill names for AI context
     const existingSkills = await db
@@ -46,7 +47,7 @@ export async function allocateSkills(params: {
       existingSkillNames,
     });
 
-    if (!extracted || extracted.length === 0) return;
+    if (!extracted || extracted.length === 0) return { masteredSkills };
 
     // Track all skill IDs allocated from this recipe
     const allocatedSkillIds: string[] = [];
@@ -123,17 +124,22 @@ export async function allocateSkills(params: {
         const newCount = existingUserSkill.practiceCount + 1;
         const nowMastered = newCount >= threshold;
 
+        const justMastered = nowMastered && !existingUserSkill.mastered;
         await db
           .update(userSkills)
           .set({
             practiceCount: newCount,
             // Update postId to the latest recipe that practiced this skill
             postId: params.postId,
-            ...(nowMastered && !existingUserSkill.mastered
+            ...(justMastered
               ? { mastered: true, masteredAt: new Date() }
               : {}),
           })
           .where(eq(userSkills.id, existingUserSkill.id));
+
+        if (justMastered) {
+          masteredSkills.push(normalizedName);
+        }
       } else {
         // First time seeing this skill — insert with count 1
         const isMastered = threshold <= 1;
@@ -167,8 +173,11 @@ export async function allocateSkills(params: {
         .set({ allocatedSkillIds: allocatedSkillIds })
         .where(eq(posts.id, params.postId));
     }
+
+    return { masteredSkills };
   } catch (error) {
     console.error("Skill allocation failed:", error);
+    return { masteredSkills };
   }
 }
 

@@ -36,6 +36,9 @@ export type UserProfileWithFollowStats = {
   followerCount: number;
   followingCount: number;
   simmrCount: number;
+  currentStreak: number;
+  longestStreak: number;
+  totalPublished: number;
 };
 
 /**
@@ -104,6 +107,9 @@ export async function getUserProfileWithFollowStats(
       foodExclusions: users.foodExclusions,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
+      currentStreak: users.currentStreak,
+      longestStreak: users.longestStreak,
+      totalPublished: users.totalPublished,
       postCount: sql<number>`count(distinct ${posts.id})::int`,
       totalLikes: sql<number>`count(distinct ${likes.id})::int`,
       followerCount: sql<number>`(

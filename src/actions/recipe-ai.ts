@@ -9,8 +9,8 @@ import {
   regenerateStepsFromIngredients,
 } from "@/lib/ai/cooking-tips";
 import { extractSkillsFromRecipe } from "@/lib/ai/skills";
-import { enforceAIRateLimitForUser } from "@/lib/rate-limit";
-import { saveToRecipeCorpus } from "@/lib/corpus";
+import { enforceAIRateLimitForUser, isRateLimitBypassed } from "@/lib/rate-limit";
+import { saveToRecipeCorpus, getCorpusRecipe, trackCorpusEvent } from "@/lib/corpus";
 import type { GeneratedRecipe, Ingredient, RecipeStep } from "@/lib/db/schema";
 import { skills } from "@/lib/db/schema";
 
@@ -31,6 +31,22 @@ export async function generateRecipe(
   }
 
   try {
+    // Corpus-first: non-bypass users get cached recipes when available
+    if (!isRateLimitBypassed(user.bypassCode ?? null)) {
+      const cached = await getCorpusRecipe(
+        dishName,
+        servings && servings >= 1 ? servings : undefined,
+        {
+          dietaryPreferences: user.dietaryPreferences,
+          foodExclusions: user.foodExclusions,
+        }
+      );
+      if (cached) {
+        void trackCorpusEvent({ endpoint: "recipe", servedFrom: "corpus", dishNameNormalized: dishName, userId: user.id });
+        return { recipe: cached };
+      }
+    }
+
     const recipe = await generateFullRecipe(
       dishName,
       servings && servings >= 1 ? servings : undefined,
@@ -44,7 +60,7 @@ export async function generateRecipe(
       return { error: "Failed to generate recipe. The AI service may be unavailable — please try again." };
     }
 
-    // Pre-cache: corpus write, cooking tip, and skill extraction — all in parallel
+    // Pre-cache: corpus write, cooking tip, skill extraction, and analytics — all in parallel
     const preCacheTasks: Promise<unknown>[] = [
       saveToRecipeCorpus({
         title: dishName,
@@ -57,6 +73,7 @@ export async function generateRecipe(
         sourceUserId: user.id,
       }),
       generateCookingTip(dishName),
+      trackCorpusEvent({ endpoint: "recipe", servedFrom: "api", dishNameNormalized: dishName, userId: user.id }),
     ];
 
     if (recipe.steps && recipe.steps.length > 0) {
