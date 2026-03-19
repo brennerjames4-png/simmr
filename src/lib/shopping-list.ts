@@ -48,7 +48,7 @@ function categorizeIngredient(name: string): string {
   return "other";
 }
 
-function normalizeIngredientName(name: string): string {
+export function normalizeIngredientName(name: string): string {
   return name
     .toLowerCase()
     .trim()
@@ -106,8 +106,31 @@ function formatQuantity(num: number): string {
   return num.toFixed(1);
 }
 
+// Original aggregation for backward compat (old shopping list flow)
 export function aggregateIngredients(
   recipes: Array<{ title: string; ingredients: Ingredient[] }>
+): ShoppingListItem[] {
+  return aggregateIngredientsWithScaling(
+    recipes.map((r) => ({
+      ...r,
+      cookServings: 1,
+      recipeServings: 1,
+    }))
+  );
+}
+
+// New scaled aggregation for integrated shopping list
+export function aggregateIngredientsWithScaling(
+  recipes: Array<{
+    title: string;
+    ingredients: Ingredient[];
+    cookServings: number;
+    recipeServings: number;
+  }>,
+  additionalIngredients?: Array<{
+    title: string;
+    ingredients: Ingredient[];
+  }>
 ): ShoppingListItem[] {
   const grouped = new Map<
     string,
@@ -119,26 +142,55 @@ export function aggregateIngredients(
     }
   >();
 
-  for (const recipe of recipes) {
-    for (const ingredient of recipe.ingredients) {
-      const normalized = normalizeIngredientName(ingredient.name);
-      const existing = grouped.get(normalized);
+  function addIngredient(
+    ingredient: Ingredient,
+    recipeTitle: string,
+    scaleFactor: number
+  ) {
+    const normalized = normalizeIngredientName(ingredient.name);
+    const existing = grouped.get(normalized);
 
-      if (existing) {
-        existing.quantities.push({
-          quantity: ingredient.quantity,
-          unit: ingredient.unit,
-        });
-        existing.sourceRecipes.add(recipe.title);
-      } else {
-        grouped.set(normalized, {
-          name: ingredient.name, // Keep original casing for display
-          quantities: [
-            { quantity: ingredient.quantity, unit: ingredient.unit },
-          ],
-          sourceRecipes: new Set([recipe.title]),
-          category: categorizeIngredient(ingredient.name),
-        });
+    // Scale the quantity
+    let scaledQty = ingredient.quantity;
+    if (scaleFactor !== 1) {
+      const parsed = parseQuantity(ingredient.quantity);
+      if (parsed !== null) {
+        scaledQty = formatQuantity(parsed * scaleFactor);
+      }
+    }
+
+    if (existing) {
+      existing.quantities.push({
+        quantity: scaledQty,
+        unit: ingredient.unit,
+      });
+      existing.sourceRecipes.add(recipeTitle);
+    } else {
+      grouped.set(normalized, {
+        name: ingredient.name,
+        quantities: [{ quantity: scaledQty, unit: ingredient.unit }],
+        sourceRecipes: new Set([recipeTitle]),
+        category: categorizeIngredient(ingredient.name),
+      });
+    }
+  }
+
+  for (const recipe of recipes) {
+    const scaleFactor =
+      recipe.recipeServings > 0
+        ? recipe.cookServings / recipe.recipeServings
+        : 1;
+
+    for (const ingredient of recipe.ingredients) {
+      addIngredient(ingredient, recipe.title, scaleFactor);
+    }
+  }
+
+  // Additional ingredients (e.g., from repurposed leftovers) — no scaling
+  if (additionalIngredients) {
+    for (const extra of additionalIngredients) {
+      for (const ingredient of extra.ingredients) {
+        addIngredient(ingredient, extra.title, 1);
       }
     }
   }
@@ -146,7 +198,6 @@ export function aggregateIngredients(
   const items: ShoppingListItem[] = [];
 
   for (const [, group] of grouped) {
-    // Try to sum quantities when units match
     const unitGroups = new Map<string, number>();
 
     for (const { quantity, unit } of group.quantities) {
@@ -159,7 +210,6 @@ export function aggregateIngredients(
           (unitGroups.get(normalizedUnit) ?? 0) + parsed
         );
       } else {
-        // Can't parse — just keep as-is
         unitGroups.set(
           `${quantity} ${unit}`.trim(),
           (unitGroups.get(`${quantity} ${unit}`.trim()) ?? 0) + 1
@@ -167,7 +217,6 @@ export function aggregateIngredients(
       }
     }
 
-    // Build the final quantity string
     let finalQuantity: string;
     let finalUnit: string;
 
@@ -176,7 +225,6 @@ export function aggregateIngredients(
       finalQuantity = formatQuantity(total);
       finalUnit = unit;
     } else {
-      // Multiple units — combine into a description
       const parts: string[] = [];
       for (const [unit, total] of unitGroups) {
         parts.push(`${formatQuantity(total)} ${unit}`);
@@ -204,4 +252,59 @@ export function aggregateIngredients(
   });
 
   return items;
+}
+
+// Phase 6: Pantry subtraction
+export type SmartShoppingListItem = ShoppingListItem & {
+  pantryStatus: "none" | "partial" | "covered";
+  pantryNote?: string;
+  originalQuantity?: string;
+};
+
+export function subtractPantryFromShoppingList(
+  shoppingItems: ShoppingListItem[],
+  pantryItems: Array<{
+    nameNormalized: string;
+    quantity: string | null;
+    unit: string | null;
+    isStaple: boolean;
+  }>
+): SmartShoppingListItem[] {
+  const pantryMap = new Map(
+    pantryItems.map((p) => [p.nameNormalized, p])
+  );
+
+  return shoppingItems.map((item) => {
+    const normalized = normalizeIngredientName(item.name);
+    const pantryItem = pantryMap.get(normalized);
+
+    if (!pantryItem) {
+      return { ...item, pantryStatus: "none" as const };
+    }
+
+    if (pantryItem.isStaple) {
+      return { ...item, pantryStatus: "covered" as const, pantryNote: "Staple — always in stock" };
+    }
+
+    // Try to compute partial coverage
+    if (pantryItem.quantity && item.unit) {
+      const pantryQty = parseQuantity(pantryItem.quantity);
+      const neededQty = parseQuantity(item.quantity);
+      if (pantryQty !== null && neededQty !== null && pantryQty < neededQty) {
+        const remaining = neededQty - pantryQty;
+        return {
+          ...item,
+          pantryStatus: "partial" as const,
+          pantryNote: `Have ${formatQuantity(pantryQty)} ${pantryItem.unit ?? item.unit}, need ${formatQuantity(remaining)} more`,
+          originalQuantity: item.quantity,
+          quantity: formatQuantity(remaining),
+        };
+      }
+      if (pantryQty !== null && neededQty !== null && pantryQty >= neededQty) {
+        return { ...item, pantryStatus: "covered" as const, pantryNote: "In pantry" };
+      }
+    }
+
+    return { ...item, pantryStatus: "partial" as const, pantryNote: "In pantry (check quantity)" };
+  });
 }

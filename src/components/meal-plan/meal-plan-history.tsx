@@ -39,7 +39,7 @@ export function MealPlanHistory({
               Week of {format(new Date(plan.weekStart), "MMM d, yyyy")}
             </p>
             <p className="text-xs text-muted-foreground">
-              {plan.days.length} meals &middot;{" "}
+              {plan.days.reduce((sum, d) => sum + (d.meals?.length ?? (d.recipe ? 1 : 0)), 0)} meals &middot;{" "}
               {format(new Date(plan.createdAt), "MMM d")}
             </p>
           </div>

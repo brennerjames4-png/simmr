@@ -69,10 +69,26 @@ export async function createShoppingListFromMealPlan(
     return { error: "Meal plan not found." };
   }
 
-  const recipes = (plan.planData as MealPlanDay[]).map((day) => ({
-    title: day.recipe.title,
-    ingredients: day.recipe.ingredients,
-  }));
+  const days = plan.planData as MealPlanDay[];
+  const recipes = days.flatMap((day) => {
+    // New format: day.meals array
+    if (day.meals && day.meals.length > 0) {
+      return day.meals
+        .filter((slot) => slot.source !== "leftover")
+        .map((slot) => ({
+          title: slot.recipe.title,
+          ingredients: slot.recipe.ingredients,
+        }));
+    }
+    // Old format: day.recipe
+    if (day.recipe) {
+      return [{
+        title: day.recipe.title,
+        ingredients: day.recipe.ingredients,
+      }];
+    }
+    return [];
+  });
 
   const weekDate = new Date(plan.weekStart).toLocaleDateString("en-US", {
     month: "short",

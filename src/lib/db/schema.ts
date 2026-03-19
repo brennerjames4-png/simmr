@@ -112,6 +112,13 @@ export type KitchenInventory = {
   customEquipment?: Array<{ name: string; count: number }>;
 };
 
+export const mealTypeEnum = pgEnum("meal_type", [
+  "breakfast",
+  "lunch",
+  "dinner",
+  "snack",
+]);
+
 export const difficultyEnum = pgEnum("difficulty_level", [
   "beginner",
   "intermediate",
@@ -165,6 +172,14 @@ export const users = pgTable(
     foodExclusions: text("food_exclusions")
       .array()
       .default(sql`'{}'`),
+    householdSize: integer("household_size").default(2),
+    defaultMealTypes: text("default_meal_types")
+      .array()
+      .default(sql`'{"dinner"}'`),
+    mealPrepEnabled: boolean("meal_prep_enabled").default(false),
+    defaultCookServingsMultiplier: integer("default_cook_servings_multiplier").default(1),
+    nutritionGoals: jsonb("nutrition_goals").$type<NutritionGoals>(),
+    tasteProfile: jsonb("taste_profile").$type<TasteProfile>(),
     bypassCode: varchar("bypass_code", { length: 100 }),
     currentStreak: integer("current_streak").default(0).notNull(),
     longestStreak: integer("longest_streak").default(0).notNull(),
@@ -379,6 +394,8 @@ export const recipeCorpus = pgTable(
     cuisineTags: text("cuisine_tags")
       .array()
       .default(sql`'{}'`),
+    mealType: text("meal_type"),
+    nutrition: jsonb("nutrition").$type<NutritionInfo>(),
     source: text("source").notNull(),
     sourceUserId: text("source_user_id").references(() => users.id, {
       onDelete: "set null",
@@ -472,6 +489,11 @@ export const mealPlans = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     weekStart: timestamp("week_start", { withTimezone: true }).notNull(),
     planData: jsonb("plan_data").$type<MealPlanDay[]>().notNull(),
+    householdSize: integer("household_size").default(2).notNull(),
+    schedule: jsonb("schedule").$type<DayMealSchedule[]>(),
+    shoppingCheckedItems: jsonb("shopping_checked_items")
+      .$type<Record<string, boolean>>()
+      .default({}),
     preferences: jsonb("preferences"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -590,16 +612,48 @@ export const userBadges = pgTable(
   ]
 );
 
-// Meal plan types
-export type MealPlanDay = {
-  day:
-    | "monday"
-    | "tuesday"
-    | "wednesday"
-    | "thursday"
-    | "friday"
-    | "saturday"
-    | "sunday";
+// Nutrition types
+export type NutritionInfo = {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+  sugar: number;
+  sodium: number;
+};
+
+export type NutritionGoals = {
+  dailyCalories: number | null;
+  dailyProtein: number | null;
+  dailyCarbs: number | null;
+  dailyFat: number | null;
+};
+
+// Taste profile types
+export type TasteProfile = {
+  preferredCuisines: string[];
+  avoidedCuisines: string[];
+  preferredProteins: string[];
+  preferredCookingMethods: string[];
+  complexityPreference: "simple" | "moderate" | "complex";
+  totalRatings: number;
+  lastUpdated: string;
+};
+
+// Day type
+export type DayOfWeek =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
+
+// Meal slot — represents a single meal within a day
+export type MealSlot = {
+  mealType: "breakfast" | "lunch" | "dinner" | "snack";
   recipe: {
     title: string;
     description: string;
@@ -609,14 +663,49 @@ export type MealPlanDay = {
     difficulty: "beginner" | "intermediate" | "advanced" | "expert";
     servings: number;
     dietaryNotes: string | null;
+    nutrition: NutritionInfo | null;
   };
-  source: "corpus" | "ai";
+  source: "corpus" | "ai" | "leftover";
+  locked: boolean;
+  cookServings: number;
+  leftoverOf?: {
+    day: string;
+    mealType: string;
+    recipeTitle: string;
+  };
+};
+
+// Per-day meal schedule
+export type DayMealSchedule = {
+  day: DayOfWeek;
+  mealTypes: ("breakfast" | "lunch" | "dinner" | "snack")[];
+};
+
+// Meal plan types
+export type MealPlanDay = {
+  day: DayOfWeek;
+  meals: MealSlot[];
+  // DEPRECATED — old plans have this shape. Read-time normalizer converts to meals[].
+  recipe?: {
+    title: string;
+    description: string;
+    ingredients: Ingredient[];
+    steps: RecipeStep[];
+    cookTime: number;
+    difficulty: "beginner" | "intermediate" | "advanced" | "expert";
+    servings: number;
+    dietaryNotes: string | null;
+  };
+  source?: "corpus" | "ai";
 };
 
 export type MealPlan = {
   id: string;
   weekStart: Date;
   days: MealPlanDay[];
+  householdSize: number;
+  schedule: DayMealSchedule[];
+  shoppingCheckedItems: Record<string, boolean>;
   createdAt: Date;
 };
 
@@ -639,6 +728,72 @@ export type ShoppingList = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+// Recipe ratings (Phase 5)
+export const recipeRatings = pgTable(
+  "recipe_ratings",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    recipeTitle: varchar("recipe_title", { length: 200 }).notNull(),
+    dishNameNormalized: varchar("dish_name_normalized", { length: 200 }).notNull(),
+    rating: integer("rating").notNull(),
+    mealPlanId: text("meal_plan_id").references(() => mealPlans.id, {
+      onDelete: "set null",
+    }),
+    tags: text("tags")
+      .array()
+      .default(sql`'{}'`),
+    notes: text("notes"),
+    cuisineTags: text("cuisine_tags")
+      .array()
+      .default(sql`'{}'`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_recipe_ratings_user").on(table.userId),
+    index("idx_recipe_ratings_user_dish").on(
+      table.userId,
+      table.dishNameNormalized
+    ),
+  ]
+);
+
+// Pantry items (Phase 6)
+export const pantryItems = pgTable(
+  "pantry_items",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 100 }).notNull(),
+    nameNormalized: varchar("name_normalized", { length: 100 }).notNull(),
+    quantity: varchar("quantity", { length: 50 }),
+    unit: varchar("unit", { length: 30 }),
+    category: varchar("category", { length: 30 }).notNull(),
+    isStaple: boolean("is_staple").default(false).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_pantry_user").on(table.userId),
+    index("idx_pantry_user_name").on(table.userId, table.nameNormalized),
+  ]
+);
 
 // Type exports
 export type User = typeof users.$inferSelect;
@@ -666,3 +821,7 @@ export type ShoppingListRow = typeof shoppingLists.$inferSelect;
 export type Collection = typeof collections.$inferSelect;
 export type CollectionItem = typeof collectionItems.$inferSelect;
 export type UserBadge = typeof userBadges.$inferSelect;
+export type RecipeRating = typeof recipeRatings.$inferSelect;
+export type NewRecipeRating = typeof recipeRatings.$inferInsert;
+export type PantryItem = typeof pantryItems.$inferSelect;
+export type NewPantryItem = typeof pantryItems.$inferInsert;

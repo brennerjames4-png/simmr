@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PlusCircle, LogOut, Search, Settings, CalendarDays, ShoppingCart, Bookmark } from "lucide-react";
+import { PlusCircle, LogOut, Search, Settings, CalendarDays, ShoppingCart, Bookmark, Package } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "./theme-toggle";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -80,6 +80,12 @@ export function Navbar({ user }: { user: User }) {
                 <Link href="/shopping" className="flex items-center gap-2">
                   <ShoppingCart className="h-4 w-4" />
                   Shopping Lists
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/pantry" className="flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Pantry
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>

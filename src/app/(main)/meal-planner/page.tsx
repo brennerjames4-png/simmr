@@ -1,7 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { getMealPlans } from "@/actions/meal-plan";
 import { MealPlannerClient } from "@/components/meal-plan/meal-planner-client";
-import { CalendarDays } from "lucide-react";
 
 export const metadata = {
   title: "Meal Planner",
@@ -20,7 +19,13 @@ export default async function MealPlannerPage() {
         </p>
       </div>
 
-      <MealPlannerClient initialPlans={plans} />
+      <MealPlannerClient
+        initialPlans={plans}
+        defaultHouseholdSize={user.householdSize ?? 2}
+        defaultServingsPerMeal={(user.defaultCookServingsMultiplier ?? 1) * (user.householdSize ?? 2)}
+        defaultMealTypes={(user.defaultMealTypes as string[]) ?? ["dinner"]}
+        defaultMealPrepEnabled={user.mealPrepEnabled ?? false}
+      />
     </div>
   );
 }
